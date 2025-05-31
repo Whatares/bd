@@ -90,6 +90,7 @@ local vigilanteWeapons = {
     ["GG-17 TAN"] = true, -- Added
     ["GG-17 GILDED"] = true, -- Added
     ["RR-Snubby GILDED"] = true, -- Added
+    ["HW-226"] = true, -- Added
 }
 
 -- Define Special Killer weapons (for the global check)
