@@ -60,6 +60,7 @@ local killerWeapons = {
     ["Sawn-off"] = true,
     ["Clothed Rosen-Obrez"] = true,
     ["Rosen-Obrez"] = true,
+    ["GraySteel K1911"] = true,
     ["DarkSteel K1911"] = true,
     ["SilverSteel K1911"] = true,
     ["K1911"] = true,
