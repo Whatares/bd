@@ -84,6 +84,7 @@ local killerWeapons = {
     ["JS-22GILDED"] = true,
     ["Sawn-offGILDED"] = true,
     ["Door'bler TIGERSTRIPES"] = true,
+    ["Anatoly's JS22"] = true,
 }
 
 local vigilanteWeapons = {
