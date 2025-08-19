@@ -88,6 +88,7 @@ local killerWeapons = {
     ["Plastic JS-22"] = true,
     ["Throwing Kunai"] = true,
     ["JTS225-OBREZ"] = true,
+    ["HEARBALLA"] = true,
 }
 
 local vigilanteWeapons = {
