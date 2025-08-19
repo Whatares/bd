@@ -89,6 +89,8 @@ local killerWeapons = {
     ["Throwing Kunai"] = true,
     ["JTS225-OBREZ"] = true,
     ["HEARBALLA"] = true,
+    ["Whiteout Rosen-Obrez"] = true,
+    ["Whiteout RR-LCP"] = true,
 }
 
 local vigilanteWeapons = {
@@ -110,7 +112,6 @@ local vigilanteWeapons = {
     ["RR-SnubbyGILDED"] = true,
     ["Pretty Pink Buxxberg-COMPACT"] = true,
     ["JS-5A-Obrez"] = true,
-    ["Whiteout Rosen-Obrez"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
