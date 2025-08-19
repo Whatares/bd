@@ -93,6 +93,7 @@ local killerWeapons = {
     ["Whiteout RR-LCP"] = true,
     ["JTS-225 Obrez Monochrome"] = true,
     ["JTS-225 Obrez"] = true,
+    ["Sawn-off10"] = true,
 }
 
 local vigilanteWeapons = {
