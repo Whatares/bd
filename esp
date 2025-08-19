@@ -99,6 +99,7 @@ local killerWeapons = {
     ["Bandages"] = true,
     ["JTS225-Obrez Poly"] = true,
     ["Mares Leg10"] = true,
+    ["JTS225-Obrez Partycannon"] = true,
 }
 
 local vigilanteWeapons = {
