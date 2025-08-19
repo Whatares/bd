@@ -112,7 +112,7 @@ local specialKillerWeapons = {
     ["RY's GG-17"] = true,
     ["AT's KAR15"] = true,
     ["VK's ANKM"] = true,
-    ["RVK"] = true
+    ["RVK"] = true,
 }
 
 -- Define a combined list of all relevant weapons
