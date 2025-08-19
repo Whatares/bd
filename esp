@@ -104,6 +104,7 @@ local vigilanteWeapons = {
     ["Buxxberg-COMPACT"] = true
     ["RR-SnubbyGILDED"] = true
     ["Pretty Pink Buxxberg-COMPACT"] = true
+    ["JS-5A-Obrez"] = true
 }
 
 -- Define Special Killer weapons (for the global check)
