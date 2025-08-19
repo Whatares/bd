@@ -114,6 +114,7 @@ local vigilanteWeapons = {
     ["RR-SnubbyGILDED"] = true,
     ["Pretty Pink Buxxberg-COMPACT"] = true,
     ["JS-5A-Obrez"] = true,
+    ["Dual Elites"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
