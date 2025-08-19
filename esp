@@ -75,15 +75,15 @@ local killerWeapons = {
     ["ChromeSlide Turqoise RR-LCP"] = true,
     ["JS-1 CYCLOPS"] = true,
     ["THUMPA"] = true,
-    ["LUT-E 'KRUS'"] = true
-    ["Memories"] = true
-    ["Hammer n Bullet"] = true
-    ["Throwing Shuriken"] = true
-    ["Throwing Tomahawk"] = true
-    ["Kamatov"] = true
-    ["JS-22GILDED"] = true
-    ["Sawn-offGILDED"] = true
-    ["Door'bler TIGERSTRIPES"] = true
+    ["LUT-E 'KRUS'"] = true,
+    ["Memories"] = true,
+    ["Hammer n Bullet"] = true,
+    ["Throwing Shuriken"] = true,
+    ["Throwing Tomahawk"] = true,
+    ["Kamatov"] = true,
+    ["JS-22GILDED"] = true,
+    ["Sawn-offGILDED"] = true,
+    ["Door'bler TIGERSTRIPES"] = true,
 }
 
 local vigilanteWeapons = {
@@ -101,10 +101,10 @@ local vigilanteWeapons = {
     ["RR-Snubby GILDED"] = true, -- Added
     ["HWISSH-226"] = true, -- Added
     ["ZKZ-Obrez10"] = true, -- Added
-    ["Buxxberg-COMPACT"] = true
-    ["RR-SnubbyGILDED"] = true
-    ["Pretty Pink Buxxberg-COMPACT"] = true
-    ["JS-5A-Obrez"] = true
+    ["Buxxberg-COMPACT"] = true,
+    ["RR-SnubbyGILDED"] = true,
+    ["Pretty Pink Buxxberg-COMPACT"] = true,
+    ["JS-5A-Obrez"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
