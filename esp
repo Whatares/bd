@@ -97,7 +97,7 @@ local killerWeapons = {
     ["Nikolai's 'Dented'"] = true,
     ["JS-44"] = true,
     ["Bandages"] = true,
-
+    ["JTS225-Obrez Poly"] = true,
 }
 
 local vigilanteWeapons = {
