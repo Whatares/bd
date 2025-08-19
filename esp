@@ -91,6 +91,7 @@ local killerWeapons = {
     ["HEARBALLA"] = true,
     ["Whiteout Rosen-Obrez"] = true,
     ["Whiteout RR-LCP"] = true,
+    ["JTS-225 Obrez Monochrome"] = true,
 }
 
 local vigilanteWeapons = {
