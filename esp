@@ -76,6 +76,14 @@ local killerWeapons = {
     ["JS-1 CYCLOPS"] = true,
     ["THUMPA"] = true,
     ["LUT-E 'KRUS'"] = true
+    ["Memories"] = true
+    ["Hammer n Bullet"] = true
+    ["Throwing Shuriken"] = true
+    ["Throwing Tomahawk"] = true
+    ["Kamatov"] = true
+    ["JS-22GILDED"] = true
+    ["Sawn-offGILDED"] = true
+    ["Door'bler TIGERSTRIPES"] = true
 }
 
 local vigilanteWeapons = {
@@ -93,6 +101,8 @@ local vigilanteWeapons = {
     ["RR-Snubby GILDED"] = true, -- Added
     ["HWISSH-226"] = true, -- Added
     ["ZKZ-Obrez10"] = true, -- Added
+    ["Buxxberg-COMPACT"] = true
+    ["RR-SnubbyGILDED"] = true
 }
 
 -- Define Special Killer weapons (for the global check)
@@ -100,6 +110,7 @@ local specialKillerWeapons = {
     ["RY's GG-17"] = true,
     ["AT's KAR15"] = true,
     ["VK's ANKM"] = true,
+    ["RVK"] = true
 }
 
 -- Define a combined list of all relevant weapons
