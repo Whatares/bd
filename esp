@@ -96,6 +96,7 @@ local killerWeapons = {
     ["Sawn-off10"] = true,
     ["Nikolai's 'Dented'"] = true,
     ["JS-44"] = true,
+    ["Bandages"] = true,
 
 }
 
