@@ -113,6 +113,7 @@ local killerWeapons = {
     ["Katya's 'Memories'"] = true,
     ["Dual SKORPS"] = true,
     ["HWISSH-KP9"] = true,
+    ["JS2-DerringyGILDED"] = true,
 }
 
 local vigilanteWeapons = {
