@@ -104,6 +104,7 @@ local killerWeapons = {
     ["CharcoalSteel JS-44"] = true,
     ["SKORPION10"] = true,
     ["Meretta 486 Palubu"] = true,
+    ["KamatovDRUM"] = true,
 }
 
 local vigilanteWeapons = {
