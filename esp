@@ -110,6 +110,7 @@ local killerWeapons = {
     ["Clothed SKORPION"] = true,
     ["CharcoalSteel SKORPION"] = true,
     ["Charcoal Steel SKORPION"] = true,
+    ["Katya's 'Memories'"] = true,
 }
 
 local vigilanteWeapons = {
