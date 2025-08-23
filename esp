@@ -135,7 +135,6 @@ local vigilanteWeapons = {
     ["Pretty Pink Buxxberg-COMPACT"] = true,
     ["JS-5A-Obrez"] = true,
     ["Dual Elites"] = true,
-    ["HWISSH-KP9"] = true,
     ["RR-Snubby10"] = true,
 }
 
