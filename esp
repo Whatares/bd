@@ -111,6 +111,7 @@ local killerWeapons = {
     ["CharcoalSteel SKORPION"] = true,
     ["Charcoal Steel SKORPION"] = true,
     ["Katya's 'Memories'"] = true,
+    ["Dual SKORPS"] = true,
 }
 
 local vigilanteWeapons = {
