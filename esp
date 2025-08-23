@@ -106,6 +106,7 @@ local killerWeapons = {
     ["Meretta 486 Palubu"] = true,
     ["KamatovDRUM"] = true,
     ["Micro KZI"] = true,
+    ["Whiteout RR-LightCompactPistolS"] = true,
 }
 
 local vigilanteWeapons = {
