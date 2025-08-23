@@ -107,6 +107,7 @@ local killerWeapons = {
     ["KamatovDRUM"] = true,
     ["Micro KZI"] = true,
     ["Whiteout RR-LightCompactPistolS"] = true,
+    ["Clothed SKORPION"] = true,
 }
 
 local vigilanteWeapons = {
