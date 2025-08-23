@@ -102,6 +102,7 @@ local killerWeapons = {
     ["Bandages"] = true,
     ["corrodedmetal JS-22"] = true,
     ["CharcoalSteel JS-44"] = true,
+    ["SKORPION10"] = true,
 }
 
 local vigilanteWeapons = {
