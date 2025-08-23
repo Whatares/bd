@@ -101,6 +101,7 @@ local killerWeapons = {
     ["JTS225-Obrez Partycannon"] = true,
     ["Bandages"] = true,
     ["corrodedmetal JS-22"] = true,
+    ["CharcoalSteel JS-44"] = true,
 }
 
 local vigilanteWeapons = {
@@ -124,6 +125,7 @@ local vigilanteWeapons = {
     ["JS-5A-Obrez"] = true,
     ["Dual Elites"] = true,
     ["HWISSH-KP9"] = true,
+    ["RR-Snubby10"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
