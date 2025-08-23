@@ -108,6 +108,8 @@ local killerWeapons = {
     ["Micro KZI"] = true,
     ["Whiteout RR-LightCompactPistolS"] = true,
     ["Clothed SKORPION"] = true,
+    ["CharcoalSteel SKORPION"] = true,
+    ["Charcoal Steel SKORPION"] = true,
 }
 
 local vigilanteWeapons = {
