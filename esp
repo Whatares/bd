@@ -114,6 +114,7 @@ local killerWeapons = {
     ["Dual SKORPS"] = true,
     ["HWISSH-KP9"] = true,
     ["JS2-DerringyGILDED"] = true,
+    ["K1911GILDED"] = true,
 }
 
 local vigilanteWeapons = {
