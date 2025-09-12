@@ -123,6 +123,7 @@ local killerWeapons = {
     ["Paradise Beagle"] = true,
     ["GZhG-7.62"] = true,
     ["AGM22"] = true,
+    ["RR-Mark2"] = true,
 }
 
 local vigilanteWeapons = {
