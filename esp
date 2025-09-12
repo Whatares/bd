@@ -124,6 +124,7 @@ local killerWeapons = {
     ["GZhG-7.62"] = true,
     ["AGM22"] = true,
     ["RR-Mark2"] = true,
+    ["Dual LCPs"] = true,
 }
 
 local vigilanteWeapons = {
