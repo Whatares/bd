@@ -120,6 +120,7 @@ local killerWeapons = {
     ["Testament"] = true,
     ["Jolibri"] = true,
     ["JAVELIN-OBREZS"] = true,
+    ["Paradise Beagle"] = true,
 }
 
 local vigilanteWeapons = {
