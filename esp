@@ -116,6 +116,8 @@ local killerWeapons = {
     ["JS2-DerringyGILDED"] = true,
     ["K1911GILDED"] = true,
     ["Mandols-5"] = true,
+    ["RDG-2B] = true,
+    ["Testament] = true,
 }
 
 local vigilanteWeapons = {
