@@ -140,6 +140,8 @@ local vigilanteWeapons = {
     ["JS-5A-Obrez"] = true,
     ["Dual Elites"] = true,
     ["RR-Snubby10"] = true,
+    ["DRICO"] = true,
+    ["HW-M5K"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
