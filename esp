@@ -120,7 +120,6 @@ local killerWeapons = {
     ["Testament"] = true,
     ["Jolibri"] = true,
     ["JAVELIN-OBREZS"] = true,
-    ["Paradise Beagle"] = true,
     ["GZhG-7.62"] = true,
     ["AGM22"] = true,
     ["RR-Mark2"] = true,
@@ -129,6 +128,7 @@ local killerWeapons = {
 
 local vigilanteWeapons = {
     ["Beagle"] = true,
+    ["Paradise Beagle"] = true,
     ["IZVEKH-412"] = true,
     ["SilverSteel RR-Snubby"] = true,
     ["RR-Snubby"] = true,
