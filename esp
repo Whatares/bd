@@ -127,6 +127,7 @@ local killerWeapons = {
     ["Mares leg Peacock"] = true,
     ["Mares legPeacock"] = true,
     ["RR-LightCompactPistolS10"] = true,
+    ["Mares leg10"] = true,
 }
 
 local vigilanteWeapons = {
@@ -152,8 +153,9 @@ local vigilanteWeapons = {
     ["RR-Snubby10"] = true,
     ["DRICO"] = true,
     ["HW-M5K"] = true,
-    ["ZKZ-Obrez SAKURA] = true,
-    ["ZKZ-ObrezSAKURA] = true,
+    ["ZKZ-Obrez SAKURA"] = true,
+    ["ZKZ-ObrezSAKURA"] = true,
+    ["ZKZ-Obrez10"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
