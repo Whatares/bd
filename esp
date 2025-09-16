@@ -155,7 +155,6 @@ local vigilanteWeapons = {
     ["HW-M5K"] = true,
     ["ZKZ-Obrez SAKURA"] = true,
     ["ZKZ-ObrezSAKURA"] = true,
-    ["ZKZ-Obrez10"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
