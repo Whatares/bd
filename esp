@@ -157,6 +157,7 @@ local vigilanteWeapons = {
     ["ZKZ-Obrez SAKURA"] = true,
     ["ZKZ-ObrezSAKURA"] = true,
     ["CharcoalSteel I412"] = true,
+    ["Comically Large Spoon"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
