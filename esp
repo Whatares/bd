@@ -136,6 +136,7 @@ local killerWeapons = {
     ["WISP"] = true,
     ["WISP Pearl"] = true,
     ["M-1020"] = true,
+    ["SKORPION 'AMIRNOV"] = true,
 }
 
 local vigilanteWeapons = {
