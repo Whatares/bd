@@ -131,6 +131,7 @@ local killerWeapons = {
     ["Kensington20"] = true,
     ["Kensington"] = true,
     ["ZOZ-106"] = true,
+    ["Whizz"] = true,
 }
 
 local vigilanteWeapons = {
