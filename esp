@@ -133,6 +133,9 @@ local killerWeapons = {
     ["ZOZ-106"] = true,
     ["Whizz"] = true,
     ["Rosen Nagan"] = true,
+    ["WISP"] = true,
+    ["WISP Pearl"] = true,
+    ["M-1020"] = true,
 }
 
 local vigilanteWeapons = {
@@ -160,6 +163,7 @@ local vigilanteWeapons = {
     ["HW-M5K"] = true,
     ["CharcoalSteel I412"] = true,
     ["Comically Large Spoon"] = true,
+    ["GG-1720"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
