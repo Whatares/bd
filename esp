@@ -124,8 +124,6 @@ local killerWeapons = {
     ["AGM22"] = true,
     ["RR-Mark2"] = true,
     ["Dual LCPs"] = true,
-    ["Mares leg Peacock"] = true,
-    ["Mares legPeacock"] = true,
     ["RR-LightCompactPistolS10"] = true,
     ["Cloth"] = true,
     ["Wild Mandols-5"] = true,
@@ -155,8 +153,6 @@ local vigilanteWeapons = {
     ["RR-Snubby10"] = true,
     ["DRICO"] = true,
     ["HW-M5K"] = true,
-    ["ZKZ-Obrez SAKURA"] = true,
-    ["ZKZ-ObrezSAKURA"] = true,
     ["CharcoalSteel I412"] = true,
     ["Comically Large Spoon"] = true,
 }
