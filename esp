@@ -165,6 +165,8 @@ local vigilanteWeapons = {
     ["CharcoalSteel I412"] = true,
     ["Comically Large Spoon"] = true,
     ["GG-1720"] = true,
+    ["Dual GG-17s"] = true,
+    ["Dual GG 17s"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
