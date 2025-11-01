@@ -138,6 +138,8 @@ local killerWeapons = {
     ["M-1020"] = true,
     ["SKORPION 'AMIRNOV"] = true,
     ["ZOZ-106"] = true,
+    ["PRTB-41"] = true,
+    ["Memorial"] = true,
 }
 
 local vigilanteWeapons = {
