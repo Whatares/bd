@@ -171,6 +171,7 @@ local vigilanteWeapons = {
     ["GG-1720"] = true,
     ["Dual GG-17s"] = true,
     ["Dual GG 17s"] = true,
+    ["Mini Ranch Rifle"] = true,
 }
 
 -- Define Special Killer weapons (for the global check)
