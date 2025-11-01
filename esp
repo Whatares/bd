@@ -142,6 +142,7 @@ local killerWeapons = {
     ["Memorial"] = true,
     ["Mooser"] = true,
     ["VA'S ANKM"] = true,
+    ["HW-K7"] = true,
 }
 
 local vigilanteWeapons = {
