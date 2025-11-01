@@ -143,6 +143,7 @@ local killerWeapons = {
     ["Mooser"] = true,
     ["VA'S ANKM"] = true,
     ["HW-K7"] = true,
+    ["TG's JAVELIN-ZVD"] = true,
 }
 
 local vigilanteWeapons = {
@@ -185,6 +186,7 @@ local specialKillerWeapons = {
     ["RVK"] = true,
     ["GZhG-7.62"] = true,
     ["AK47 Case Hardened 1000000"] = true,
+    ["TG's JAVELIN-ZVD"] = true,
 }
 
 -- Define a combined list of all relevant weapons
