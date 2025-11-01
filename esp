@@ -141,6 +141,7 @@ local killerWeapons = {
     ["PRTB-41"] = true,
     ["Memorial"] = true,
     ["Mooser"] = true,
+    ["VA'S ANKM"] = true,
 }
 
 local vigilanteWeapons = {
@@ -179,6 +180,7 @@ local specialKillerWeapons = {
     ["RY's GG-17"] = true,
     ["AT's KAR15"] = true,
     ["VK's ANKM"] = true,
+    ["VA'S ANKM"] = true,
     ["RVK"] = true,
     ["GZhG-7.62"] = true,
     ["AK47 Case Hardened 1000000"] = true,
