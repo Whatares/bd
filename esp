@@ -2,15 +2,7 @@
 --[[
 Integrated ESP LocalScript with Rayfield UI, Role Detection, Distance Locking,
 and Enhanced Hint Matching including AssignedTask check.
-Fixed issue where players were tagged as hint match when no hints were present.
-Updated hint parsing to handle AssignedTask directly after "Is often seen ".
-Corrected hint matching logic to handle hints with only traits or only tasks,
-and only performs hint matching if the local player is the killer based on the hint text prefix.
-UPDATED: Modified hint parsing and matching to check AssignedTask or Configuration.Value based on hint type ("Is often seen" presence).
-Ensured Hint Match tagging is correctly prioritized and applied.
-FIXED: Ensure "Hints : ", " + ", and "[1] ", "[2] " (including spaces) are removed during parsing.
-ADDED: More detailed debug prints to specifically track tagging logic in detectRoles, including hint match conditions.
-ADDED: Automatic hint text check if the local player is the solo killer under the New Highest Priority rule.
+FIXED: The Distance Locking mechanism (Priority 4) is now properly activated when the "Everyone has a gun" condition is met, and only if no higher-priority Killer/Juggernaut rules (P1, P2, P3) are active. This ensures the Specific Juggernaut gun (P2) correctly overrides the distance lock.
 UPDATED: Implemented a new Priority 2 rule: If the Special Killer holds one of three specific high-value weapons (AK47 Case Hardened 1000000, RVK, Pretty Pink RVK), all other players with any registered role weapon are tagged as VIGILANTE.
 ]]
 
@@ -150,6 +142,7 @@ local killerWeapons = {
 ["TG's JTS225"] = true,
 ["Mason's Machete"] = true,
 ["Pretty Pink RVK"] = true,
+["Skeleton Rosen-Obrez"] = true,
 }
 
 local vigilanteWeapons = {
@@ -219,7 +212,7 @@ local innocentColor = Color3.fromRGB(0, 255, 0) -- Green
 local innocentLabel = "INNOCENT"
 local hintMatchColor = Color3.new(1, 1, 0) -- Yellow
 local hintMatchLabel = "HINT MATCH"
-local vigilanteHintColor = Color3.fromRGB(128, 0, 128) -- Purple -- THIS IS THE PURPLE COLOR
+local vigilanteHintColor = Color3.fromRGB(128, 0, 128) -- Purple
 local vigilanteHintLabel = "VIGILANTE + HINT MATCH" -- THIS IS THE PURPLE LABEL
 
 -- Define the distance threshold for the new rule
@@ -237,7 +230,7 @@ local stopEspLoop = false -- Signal to stop the detection loop
 local espPlayerAddedConnection = nil -- Store the main PlayerAdded connection
 local espCharacterAddedConnections = {} -- Store per-player CharacterAdded connections
 
--- State variables for the distance locking rule
+-- State variables for the distance locking rule (PERSIST ACROSS DETECTROLES CALLS)
 local rolesLockedByDistance = false -- Flag indicating if distance roles are locked
 local lockedDistanceRoles = {} -- Stores the determined distance role ("Killer" or "Innocent")
 
@@ -315,7 +308,6 @@ end
 end
 
 -- Helper function to collect a player's tools
--- UPDATED: Now checks the player's model within NPCSFolder for tools as well.
 local function collectPlayerTools(player)
 local tools = {}
 local backpack = player:FindFirstChildOfClass("Backpack")
@@ -381,17 +373,15 @@ return nil, nil, nil
 
 end
 
--- Function to parse a single string of hint content (after removing prefixes like [1] or [2])
--- Returns the type ("task" or "trait") and the extracted value, or "invalid" and nil.
+-- Function to parse a single string of hint content
 local function parseSingleHint(hintContent)
 local hintType = "invalid"
 local hintValue = nil
 local cleanedContent = hintContent:match("^%s*(.-)%s*$") or "" -- Trim leading/trailing whitespace
 
-print("DEBUG: parseSingleHint called with:", cleanedContent)
+-- print("DEBUG: parseSingleHint called with:", cleanedContent) -- Excessive logging
 
 if string.len(cleanedContent) == 0 then
-    print("DEBUG: parseSingleHint: Empty content after trimming.")
     return hintType, hintValue
 end
 
@@ -400,7 +390,6 @@ local taskMatch = cleanedContent:match("^Is often seen%s*(.*)$")
 if taskMatch then
     hintType = "task"
     hintValue = taskMatch:match("^%s*(.-)%s*$") -- Trim extracted task
-    print("DEBUG: Parsed as Task. Value:", hintValue)
     return hintType, hintValue
 end
 
@@ -412,17 +401,14 @@ if traitBracketMatch then
     if string.len(cleanClue) > 0 and cleanClue:lower() ~= "assigned task" and cleanClue:lower() ~= "seen" then
         hintType = "trait"
         hintValue = cleanClue
-        print("DEBUG: Parsed as Bracketed Trait. Value:", hintValue)
         return hintType, hintValue
     end
 end
 
 -- If neither format matched, treat the entire cleaned content as a single unbracketed trait.
--- This handles cases like "Has no clothes covering their knee" or "Has long sleeves".
 if hintType == "invalid" then
     hintType = "trait" -- Assume it's an unbracketed trait
     hintValue = cleanedContent
-    print("DEBUG: Parsed as Unbracketed Trait. Value:", hintValue)
 end
 
 return hintType, hintValue
@@ -430,53 +416,37 @@ return hintType, hintValue
 end
 
 -- Function to update the playersMatchingHints table based on current GUI hints
--- MODIFIED: Now correctly handles hints for multiple targets ([1], [2], etc.)
--- A player matches if they meet ALL conditions for AT LEAST ONE target.
 local function updateMatchingHintPlayers()
-print("DEBUG: updateMatchingHintPlayers called")
+-- print("DEBUG: updateMatchingHintPlayers called") -- Excessive logging
 playersMatchingHints = {} -- Clear the previous results
-print("DEBUG: playersMatchingHints cleared")
 
-if not espEnabled then print("DEBUG: updateMatchingHintPlayers: ESP not enabled"); return end -- Only update if ESP is on
-
+if not espEnabled then return end
 
 local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
-if not PlayerGui then print("DEBUG: updateMatchingHintPlayers: PlayerGui not found"); return end
+if not PlayerGui then return end
 
--- Safely find the TARGETHINT label. Assuming it's under RESETONDEATHStatusGui based on the larger script.
-local TargetHintLabel = PlayerGui:FindFirstChild("RESETONDEATHStatusGui") and PlayerGui.RESETONDEATHStatusGui:FindFirstChild("TARGETHINT") -- Corrected path based on typical GUI structure
+local TargetHintLabel = PlayerGui:FindFirstChild("RESETONDEATHStatusGui") and PlayerGui.RESETONDEATHStatusGui:FindFirstChild("TARGETHINT")
 
 if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
-    -- warn("Blood Debt Role Detector: TARGETHINT label not found or not a TextLabel.") -- Optional warning
-    print("DEBUG: updateMatchingHintPlayers: TARGETHINT label not found or invalid")
     return
 end
 
 local hintText = TargetHintLabel.Text
-print("DEBUG: Raw TARGETHINT text:", hintText) -- Print raw hint text
 
-if string.len(string.gsub(hintText, "%s", "")) == 0 then -- Check if the hint text is empty or just whitespace
-    -- No hints means no one can match all hints
-    print("DEBUG: Hint text is empty.") -- Optional Debug
+if string.len(string.gsub(hintText, "%s", "")) == 0 then
     return
 end
 
--- Check if the local player is the killer based on the hint text prefix
-local hintPrefix = "Hints : " -- Note: Capitalized 'H' as per your example
-local lowerHintText = string.lower(hintText) -- Store lowercased text in a variable
-local lowerHintPrefix = string.lower(hintPrefix) -- Lowercase the prefix for comparison
+local hintPrefix = "Hints : "
+local lowerHintText = string.lower(hintText)
+local lowerHintPrefix = string.lower(hintPrefix)
 
 if lowerHintText:sub(1, string.len(lowerHintPrefix)) ~= lowerHintPrefix then
-    print("DEBUG: Local player is not the killer ('" .. hintText:sub(1, string.len(hintPrefix)) .. "' != '" .. hintPrefix .. "'). Skipping hint matching.") -- Optional Debug
     return -- Exit if the hint text doesn't start with "Hints : "
 end
 
--- Remove the "Hints : " prefix and any trailing space
 local actualHintContent = hintText:sub(string.len(hintPrefix) + 1):match("^%s*(.-)%s*$")
-print("DEBUG: Raw Hint Content (after removing 'Hints : ' and trimming):", actualHintContent) -- Print raw hint content
 
--- Split the hint content by " + " into individual hint parts.
--- Each part might belong to a different target indicated by [1], [2], etc.
 local individualHintParts = {}
 local currentPos = 1
 while currentPos <= string.len(actualHintContent) do
@@ -492,194 +462,135 @@ while currentPos <= string.len(actualHintContent) do
     end
 end
 
--- Handle the case of a single hint without " + "
 if #individualHintParts == 0 and string.len(actualHintContent) > 0 then
     table.insert(individualHintParts, actualHintContent)
 end
 
-print("DEBUG: Split into Individual Hint Parts:", individualHintParts)
-
 local targetConditions = {} -- Table to hold conditions, grouped by target number
 
 for i, hintPartContent in ipairs(individualHintParts) do
-    -- Extract target number and cleaned content from the hint part
-    local targetNumberMatch = hintPartContent:match("^%[%s*(%d+)%s*%]") -- Capture the number inside brackets
+    local targetNumberMatch = hintPartContent:match("^%[%s*(%d+)%s*%]")
     local targetNumber = tonumber(targetNumberMatch) or 1 -- Default to target 1 if no number found
     local cleanedHintPartContent = hintPartContent:gsub("^%[%s*%d+%s*%]%s*", ""):match("^%s*(.-)%s*$") or "" -- Remove [number] prefix and trim
-
-    print("DEBUG: Processing Hint Part:", hintPartContent, "Target Number:", targetNumber, "Cleaned Content:", cleanedHintPartContent)
 
     local hintType, hintValue = parseSingleHint(cleanedHintPartContent)
 
     if hintType ~= "invalid" and hintValue and string.len(hintValue) > 0 then
-        -- Add the parsed condition to the list for this target number
         if not targetConditions[targetNumber] then
             targetConditions[targetNumber] = {}
         end
         table.insert(targetConditions[targetNumber], { type = hintType, value = hintValue })
-        print("DEBUG: Parsed Condition for Target", targetNumber, ": Type =", hintType, "Value =", hintValue)
-    else
-         print("DEBUG: Hint Part", i, "contained no valid condition after parsing. Skipping.")
     end
 end
 
--- Now, check each player. A player matches if they meet ALL conditions for AT LEAST ONE target.
-if next(targetConditions) == nil then -- Check if the table is empty
-    print("DEBUG: No valid target conditions parsed from hint text. No players will match.")
-    return -- No conditions means no matches
+if next(targetConditions) == nil then
+    return
 end
 
 
--- Ensure NPCSFolder is available (waited for at the top)
 if not NPCSFolder then
-    warn("Blood Debt Role Detector: NPCSFolder not available for hint matching.")
     return
 end
 
 for _, player in Players:GetPlayers() do
-    -- Only check other players
     if player ~= lp then
         local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
 
         if playerNPCModel then
              local configObject = playerNPCModel:FindFirstChild("Configuration")
-             -- Configuration object is needed for trait checks
 
-             local playerMatchesAnyTarget = false -- Flag to see if player matches ANY target's conditions
+             local playerMatchesAnyTarget = false
 
-             for targetNumber, conditionsForTarget in pairs(targetConditions) do -- Iterate through each target's conditions
-                 local playerMatchesAllConditionsForTarget = true -- Flag to see if player matches ALL conditions for THIS target
+             for targetNumber, conditionsForTarget in pairs(targetConditions) do
+                 local playerMatchesAllConditionsForTarget = true
 
-                 print("DEBUG: Checking player", player.Name, "against conditions for Target", targetNumber)
-
-                 for i, condition in ipairs(conditionsForTarget) do -- Iterate through each condition for the current target
-                     print("DEBUG:   Checking Condition", i, " (Type:", condition.type, ", Value:", condition.value, ") for Target", targetNumber)
-
+                 for i, condition in ipairs(conditionsForTarget) do
                      local conditionMet = false
 
                      if condition.type == "task" then
-                         -- Check AssignedTask directly under the player's NPC model
                          local assignedTaskObject = playerNPCModel:FindFirstChild("AssignedTask")
-                         print("DEBUG:     Checking Task for player", player.Name, ": Hint Value =", condition.value, ", AssignedTask Object Found =", assignedTaskObject ~= nil, ", AssignedTask Value =", assignedTaskObject and assignedTaskObject.Value or "N/A")
                          if assignedTaskObject and assignedTaskObject:IsA("StringValue") and assignedTaskObject.Value == condition.value then
                              conditionMet = true
-                             print("DEBUG:     Player", player.Name, "MATCHES Task:", condition.value, " for Target", targetNumber)
-                         else
-                             print("DEBUG:     Player", player.Name, "does NOT match Task:", condition.value, " for Target", targetNumber)
                          end
                      elseif condition.type == "trait" then
-                         -- Check for the trait under Configuration.Value
-                         if configObject then -- Ensure Configuration exists for trait checks
-                              -- MODIFIED: Iterate through all children of Configuration
-                              print("DEBUG:     Checking Trait for player", player.Name, ": Hint Value =", condition.value, ". Searching Configuration children.")
+                         if configObject then
                               for _, configChild in ipairs(configObject:GetChildren()) do
                                   if configChild:IsA("StringValue") then
-                                      print("DEBUG:       Checking Configuration StringValue:", configChild.Name, ", Value:", configChild.Value)
                                       if configChild.Value == condition.value then
                                           conditionMet = true
-                                          print("DEBUG:       Player", player.Name, "MATCHES Trait (Configuration child):", condition.value, " via StringValue:", configChild.Name, " for Target", targetNumber)
-                                          break -- Found a matching trait, no need to check other StringValues in Configuration for this condition
+                                          break
                                       end
                                   end
                               end
-                              if not conditionMet then
-                                  print("DEBUG:     Player", player.Name, "does NOT match Trait (Configuration children):", condition.value, " for Target", targetNumber)
-                              end
-                         else
-                             print("DEBUG:     Player", player.Name, "NPC model does not have 'Configuration' object. Cannot check trait for Target", targetNumber)
                          end
                      end
 
-                     -- If the player does NOT meet this specific condition for THIS target, they do NOT match ALL conditions for THIS target
                      if not conditionMet then
                          playerMatchesAllConditionsForTarget = false
-                         print("DEBUG: Player", player.Name, "does NOT match Condition", i, " for Target", targetNumber, ". Marking as NOT matching ALL conditions for THIS target.")
-                         break -- Player doesn't match this condition for this target, no need to check other conditions for THIS target
+                         break
                      end
-                 end -- End of loop through conditions for the current target
+                 end
 
-                 -- If the player matched ALL conditions for THIS target, they match ANY target
                  if playerMatchesAllConditionsForTarget then
                      playerMatchesAnyTarget = true
-                     print("DEBUG: Player", player.Name, "MATCHES ALL conditions for Target", targetNumber, ". Marking as matching ANY target.")
-                     break -- Player matches this target, no need to check other targets for this player
+                     break
                  end
-             end -- End of loop through targets
-
-             -- If the player matched ANY target's conditions, add them to playersMatchingHints
-             if playerMatchesAnyTarget then
-                 playersMatchingHints[player] = true
-                 print("DEBUG: Player", player.Name, "MARKED as playersMatchingHints (matched ANY target).") -- Optional Debug
-             -- else
-                  -- print("DEBUG: Player", player.Name, "does NOT match ANY target's conditions.") -- Optional Debug
              end
 
-          -- else
-              -- print("DEBUG: Player", player.Name, "model under NPCSFolder does not have 'Configuration' object.") -- Optional Debug
-          end
-     -- else
-          -- print("DEBUG: Player", player.Name, "model not found under NPCSFolder.") -- Optional Debug
-     end
- end
+             if playerMatchesAnyTarget then
+                 playersMatchingHints[player] = true
+             end
+        end
+    end
+end
 
 end -- End of updateMatchingHintPlayers function
 
--- Function to connect the hint text changed signal (called when ESP is enabled, and now on character added)
+-- Function to connect the hint text changed signal
 local function connectHintTextSignal()
 if not espEnabled then return end
--- Disconnect existing connection before trying to connect a new one
 if hintTextConnection then
-print("DEBUG: Disconnecting existing hintTextConnection.")
 hintTextConnection:Disconnect()
 hintTextConnection = nil
 end
 
 local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
- if not PlayerGui then print("DEBUG: connectHintTextSignal: PlayerGui not found"); return end
+ if not PlayerGui then return end
 
- -- Safely wait for the GUI elements needed for the hint
- -- Increased wait times slightly for robustness
- local statusGui = PlayerGui:WaitForChild("RESETONDEATHStatusGui", 20) -- Increased wait time
+ local statusGui = PlayerGui:WaitForChild("RESETONDEATHStatusGui", 20)
  if not statusGui then
-     warn("Blood Debt Role Detector: Could not find RESETONDEATHStatusGui after waiting. Hint matching disabled.")
-     print("DEBUG: connectHintTextSignal: RESETONDEATHStatusGui not found.")
      return
  end
 
- local TargetHintLabel = statusGui:WaitForChild("TARGETHINT", 10) -- Increased wait time
+ local TargetHintLabel = statusGui:WaitForChild("TARGETHINT", 10)
  if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
-     warn("Blood Debt Role Detector: Could not find TARGETHINT TextLabel or it's not a TextLabel after waiting. Hint matching disabled.")
-     print("DEBUG: connectHintTextSignal: TARGETHINT TextLabel not found or invalid.")
      return
  end
 
- -- Connect the signal from TargetHintLabel directly
  hintTextConnection = TargetHintLabel:GetPropertyChangedSignal("Text"):Connect(updateMatchingHintPlayers)
- print("Blood Debt Role Detector: TARGETHINT TextLabel signal connected.")
  updateMatchingHintPlayers() -- Run initial check immediately after connecting
 
 end
 
 -- Detect and apply roles - Integrated updated logic and priorities
 local function detectRoles()
-if not espEnabled then print("DEBUG: detectRoles: ESP not enabled, skipping."); return end -- Safety check
-print("DEBUG: detectRoles called.")
+if not espEnabled then return end
+
+-- Initialize local flags for this run
+local everyoneHasGunConditionMet = false
+local noOneHasGunConditionMet = false
 
 -- State for New Highest Priority Killer rule (Priority 1)
 local newHighestPriorityKillerDetected = false
 local theSingleKillerGunHolder = nil
 
--- State for Specific Juggernaut rule (NEW Priority 2)
+-- State for Specific Juggernaut rule (Priority 2)
 local specificJuggernautDetected = false
 local theSpecificJuggernautHolder = nil -- Holder of the specific weapon
 
 -- State for existing Special Killer rule (Priority 3 now)
 local specialKillerDetected = false
 local playersWithSpecialWeapons = {}
-
--- State for Distance Locking rule (Priority 4 now)
-local rolesLockedByDistance = false -- Flag indicating if distance roles are locked
-local lockedDistanceRoles = {} -- Stores the determined distance role ("Killer" or "Innocent")
 
 local playersWithValidCharacters = {} -- Track players who are not local and have characters/HRP
 local playersWithoutAnyGun = {}         -- Track players without *any* role weapon
@@ -694,10 +605,8 @@ local singleKillerGunHolderCandidate = nil
 
 -- **Pass 1: Scan for conditions and identify player states**
 for _, player in ipairs(Players:GetPlayers()) do
-    -- Only process players who are not the local player and have a valid character model with HRP
-    -- NOTE: We still check player.Character here for tagging purposes, even though hint data is elsewhere
     if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-         playersWithValidCharacters[player] = true -- Mark as valid target for tagging
+         playersWithValidCharacters[player] = true
 
          local toolsByName = collectPlayerTools(player)
          local hasAnyRoleWeapon = false
@@ -710,23 +619,23 @@ for _, player in ipairs(Players:GetPlayers()) do
              if specialKillerWeapons[name] then
                  specialKillerDetected = true
                  playersWithSpecialWeapons[player] = true
-                 
+
                  -- NEW CHECK: If this is one of the specific Juggernaut weapons
                  if specificJuggernautWeapons[name] then
                      specificJuggernautDetected = true
                      theSpecificJuggernautHolder = player
                  end
              end
-             -- Check if it's *any* role weapon (for Everyone Has Gun/No One Has Gun)
+             -- Check if it's *any* role weapon
              if allRoleWeapons[name] then
                   hasAnyRoleWeapon = true
              end
-             -- Check for Vigilante weapon (for New #1 rule and First Vigilante)
+             -- Check for Vigilante weapon
              if vigilanteWeapons[name] then
                  hasVigilanteWeapon = true
-                 playersWithVigilanteWeapons[player] = true -- Mark player as having a Vigilante weapon
+                 playersWithVigilanteWeapons[player] = true
              end
-             -- Check for ANY Killer weapon (for New #1 rule) - Use updated killerWeapons list
+             -- Check for ANY Killer weapon
              if killerWeapons[name] then
                  hasKillerWeapon = true
              end
@@ -734,7 +643,6 @@ for _, player in ipairs(Players:GetPlayers()) do
 
          if hasVigilanteWeapon then
               vigilanteCount = vigilanteCount + 1
-              -- Track the first vigilante detected across all ESP runs
               if firstVigilanteTracker[player] == nil then
                   firstVigilanteTracker[player] = true
               end
@@ -742,18 +650,17 @@ for _, player in ipairs(Players:GetPlayers()) do
 
           if hasKillerWeapon then
               killerGunHoldersCount = killerGunHoldersCount + 1
-              singleKillerGunHolderCandidate = player -- Candidate for the single killer gun holder
+              singleKillerGunHolderCandidate = player
          end
 
 
          if not hasAnyRoleWeapon then
-             playersWithoutAnyGun[player] = true -- Mark if they have no role weapon
+             playersWithoutAnyGun[player] = true
          else
-             playersWithAnyGun[player] = true -- Mark if they DO have a role weapon
+             playersWithAnyGun[player] = true
          end
 
     else
-        -- Player is local player or without a valid character - ensure tags are cleared
         clearOldStuff(player.Character)
     end
 end
@@ -762,103 +669,97 @@ end
 if vigilanteCount == 1 and killerGunHoldersCount == 1 and singleKillerGunHolderCandidate then
      newHighestPriorityKillerDetected = true
      theSingleKillerGunHolder = singleKillerGunHolderCandidate
-     -- Note: This rule overrides lower priority conditions if it applies
-     specialKillerDetected = false -- Clears Priority 3/4 conditions
-     specificJuggernautDetected = false -- Clears Priority 2 condition
-     playersWithSpecialWeapons = {}
-     everyoneHasGunConditionMet = false -- Ensure distance lock rule is NOT checked if this one is ON
-     rolesLockedByDistance = false      -- Ensure distance lock is OFF if this one is ON
+     -- This high-priority rule overrides all lower rules
+     specialKillerDetected = false
+     specificJuggernautDetected = false
+     rolesLockedByDistance = false
      lockedDistanceRoles = {}
 
-     -- ADDED: If local player is the New Highest Priority Killer, trigger hint check
      if theSingleKillerGunHolder == lp then
-         print("DEBUG: Local player is New #1 Killer. Triggering updateMatchingHintPlayers.")
          updateMatchingHintPlayers()
      end
-
-     -- print("DEBUG: New Highest Priority Killer rule MET (1 Vigilante, 1 Killer Gun).") -- DEBUG
--- else
-     -- print("DEBUG: New Highest Priority Killer rule NOT MET. Vigilante Count:", vigilanteCount, "Killer Gun Holders:", killerGunHoldersCount) -- Optional DEBUG
 end
 
 
--- **Step 3: Determine the state of "Everyone has a gun" and "No one has a gun" conditions (Only if no Priority 1, 2, or 3)**
-if not newHighestPriorityKillerDetected and not specificJuggernautDetected and not specialKillerDetected then -- Check these ONLY if higher rules are OFF
-     -- Check "Everyone has a gun" (only if no special killer)
-     local allValidTargetsHaveGun = true
-     local otherPlayersWithCharCount = 0
-     for player, _ in pairs(playersWithValidCharacters) do
-         if player ~= lp then otherPlayersWithCharCount = otherPlayersWithCharCount + 1 end
-         if playersWithoutAnyGun[player] then
-             allValidTargetsHaveGun = false -- Found someone without a gun
-             break
-         end
-     end
-     -- Condition is met if all valid targets had a gun AND there is at least one valid target besides local player
-     if allValidTargetsHaveGun and otherPlayersWithCharCount > 0 then
-         everyoneHasGunConditionMet = true
-         -- print("DEBUG: 'Everyone has a gun' condition MET.") -- DEBUG
-     -- else
-         -- print("DEBUG: 'Everyone has a gun' condition NOT MET.") -- DEBUG
-     end
+-- **Step 3: Determine the state of "Everyone has a gun" and "No one has a gun" conditions**
+-- These conditions are calculated *regardless* of P1, P2, P3, but P4 logic later relies on P1/P2/P3 being inactive.
+local otherPlayersWithCharCount = 0
+for player, _ in pairs(playersWithValidCharacters) do
+    if player ~= lp then otherPlayersWithCharCount = otherPlayersWithCharCount + 1 end
+end
 
-     -- Check "No one has a gun" (only if no special killer)
-     local anyValidTargetHasGun = false
-     for player, _ in pairs(playersWithValidCharacters) do
-          if playersWithAnyGun[player] then
-              anyValidTargetHasGun = true -- Found someone *with* a gun
-              break
-          end
+-- 3a: Check "Everyone has a gun"
+local allValidTargetsHaveGun = true
+for player, _ in pairs(playersWithValidCharacters) do
+    if playersWithoutAnyGun[player] then
+        allValidTargetsHaveGun = false
+        break
+    end
+end
+if allValidTargetsHaveGun and otherPlayersWithCharCount > 0 then
+    everyoneHasGunConditionMet = true
+end
+
+-- 3b: Check "No one has a gun"
+local anyValidTargetHasGun = false
+for player, _ in pairs(playersWithValidCharacters) do
+     if playersWithAnyGun[player] then
+         anyValidTargetHasGun = true
+         break
      end
-     -- Condition is met if NO valid target has a gun AND there is at least one valid target
-     if not anyValidTargetHasGun and otherPlayersWithCharCount > 0 then
-          noOneHasGunConditionMet = true
-          -- print("DEBUG: 'No one has a gun' condition MET.") -- DEBUG
-     -- else
-         -- print("DEBUG: 'No one has a gun' condition NOT MET.") -- Optional Debug
-     end
+end
+if not anyValidTargetHasGun and otherPlayersWithCharCount > 0 then
+     noOneHasGunConditionMet = true
 end
 
 
 -- **Step 4: Manage the distance locking state (rolesLockedByDistance) (Priority 4 logic)**
--- The lock should only be managed if none of the higher priorities (P1, P2, P3) are active.
 
--- Condition to ACTIVATE lock: No P1, P2, P3 AND Everyone has a gun AND Not already locked
-if not newHighestPriorityKillerDetected and not specificJuggernautDetected and not specialKillerDetected and everyoneHasGunConditionMet and not rolesLockedByDistance then
-     rolesLockedByDistance = true -- Activate the lock
-     lockedDistanceRoles = {} -- Clear any old locked roles
-     print("Blood Debt Role Detector: Distance Lock ACTIVATED.") -- DEBUG
+local higherPriorityActive = newHighestPriorityKillerDetected or specificJuggernautDetected or specialKillerDetected
 
-     -- Determine and store the distance-based roles for locking
-     local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") -- Need local HRP for distance
+if not higherPriorityActive then -- Only manage the lock if P1, P2, P3 are inactive (Standard Game Mode)
 
-     if localHRP then
-         for player, _ in pairs(playersWithValidCharacters) do
-             local playerHRP = player.Character:FindFirstChild("HumanoidRootPart")
-             if playerHRP then
-                 local distance = (localHRP.Position - playerHRP.Position).Magnitude
-                 if distance >= distanceThreshold then
-                      lockedDistanceRoles[player] = "Killer"
-                 else
-                      lockedDistanceRoles[player] = "Innocent"
-                 end
-             else
-                  -- Should not happen if playersWithValidCharacters is correct, but safety
-             end
-         end
-     else
-          -- Local player HRP missing - cannot lock distance roles
-          rolesLockedByDistance = false -- Force lock off if cannot calculate distance
-          lockedDistanceRoles = {}
-          warn("Blood Debt Role Detector: Distance Lock failed to activate: Local HRP missing.")
+     -- ACTIVATE Lock (Condition: Everyone has a gun AND Lock is currently OFF)
+     if everyoneHasGunConditionMet and not rolesLockedByDistance then
+          rolesLockedByDistance = true -- Activate the lock
+          lockedDistanceRoles = {} -- Clear any old locked roles
+          print("Blood Debt Role Detector: Distance Lock ACTIVATED by 'Everyone has a gun'.") -- DEBUG
+
+          local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+
+          if localHRP then
+              for player, _ in pairs(playersWithValidCharacters) do
+                  local playerHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                  if playerHRP then
+                      local distance = (localHRP.Position - playerHRP.Position).Magnitude
+                      if distance >= distanceThreshold then
+                           lockedDistanceRoles[player] = "Killer"
+                      else
+                           lockedDistanceRoles[player] = "Innocent"
+                      end
+                  end
+              end
+          else
+               rolesLockedByDistance = false -- Force lock off if cannot calculate distance
+               lockedDistanceRoles = {}
+               warn("Blood Debt Role Detector: Distance Lock failed to activate: Local HRP missing.")
+          end
+
+     -- DEACTIVATE Lock (Condition: No one has a gun AND Lock is currently ON)
+     elseif noOneHasGunConditionMet and rolesLockedByDistance then
+          rolesLockedByDistance = false -- Deactivate the lock
+          lockedDistanceRoles = {} -- Clear stored roles
+          print("Blood Debt Role Detector: Distance Lock DEACTIVATED by 'No one has a gun'.")
      end
-end
 
--- Condition to DEACTIVATE lock: No P1, P2, P3 AND No one has a gun AND Currently locked
-if not newHighestPriorityKillerDetected and not specificJuggernautDetected and not specialKillerDetected and noOneHasGunConditionMet and rolesLockedByDistance then
-     rolesLockedByDistance = false -- Deactivate the lock
-     lockedDistanceRoles = {} -- Clear stored roles
-     print("Blood Debt Role Detector: Distance Lock DEACTIVATED.") -- DEBUG
+else
+     print("DEBUG: Higher Priority Active (P1/P2/P3). Distance lock management skipped/maintained override.")
+     -- Ensure the lock is off if a new higher priority rule is detected, even if it wasn't cleared by P1 logic
+     if rolesLockedByDistance then
+         rolesLockedByDistance = false
+         lockedDistanceRoles = {}
+         print("DEBUG: Higher Priority detected: Cleared residual Distance Lock.")
+     end
 end
 
 
@@ -868,21 +769,15 @@ updateMatchingHintPlayers()
 
 -- **Pass 2: Apply Tags based on determined state (New #1 > Specific Juggernaut > Special Killer > Distance Locked > Vigilante+Hint > Hint Match > Standard)**
 for _, player in ipairs(Players:GetPlayers()) do
-    -- Only process players who were marked as valid targets in Pass 1
     if playersWithValidCharacters[player] then
 
          if newHighestPriorityKillerDetected and player == theSingleKillerGunHolder then
              -- Priority 1: New #1 Killer Rule
-             print("DEBUG: Applying New #1 Killer tag for", player.Name)
              tagPlayer(player, killerColor, killerLabel)
 
          elseif specificJuggernautDetected then
-             -- NEW Priority 2: Specific Juggernaut Rule (AK47, RVK, Pretty Pink RVK)
-             print("DEBUG: Applying Specific Juggernaut Rule (Priority 2) for", player.Name)
-
+             -- Priority 2: Specific Juggernaut Rule (AK47, RVK, Pretty Pink RVK)
              if player == theSpecificJuggernautHolder then
-                 -- Player with the specific Juggernaut gun is the Killer
-                 print("DEBUG: Tagging", player.Name, "as KILLER (Specific Juggernaut).")
                  tagPlayer(player, killerColor, killerLabel)
              else
                  -- All other players: Check if they have *any* role weapon
@@ -897,67 +792,48 @@ for _, player in ipairs(Players:GetPlayers()) do
 
                  if hasAnyRoleWeapon then
                      -- They have a registered gun, tag them as VIGILANTE
-                     print("DEBUG: Tagging", player.Name, "as VIGILANTE (Specific Juggernaut override).")
                      tagPlayer(player, vigilanteColor, vigilanteLabel)
                  else
                      -- They have no registered gun, tag them as INNOCENT
-                     print("DEBUG: Tagging", player.Name, "as INNOCENT (Specific Juggernaut override).")
                      tagPlayer(player, innocentColor, innocentLabel)
                  end
              end
 
          elseif specialKillerDetected then
-             -- Original Priority 2 (Now Priority 3): Special Killer rule (Existing - for non-specific special guns)
-             -- Rule: Holder is Killer. Everyone else is Innocent when special is present.
+             -- Priority 3: Special Killer rule (General Special Guns)
              if playersWithSpecialWeapons[player] then
-                 print("DEBUG: Applying Special Killer tag (Priority 3) for", player.Name)
                  tagPlayer(player, killerColor, killerLabel)
              else
-                 print("DEBUG: Applying Innocent tag (under Special Killer Rule - Priority 3) for", player.Name)
                  tagPlayer(player, innocentColor, innocentLabel)
              end
 
          elseif rolesLockedByDistance then
              -- Priority 4: Roles locked by "Everyone has a gun" rule - Use LOCKED distance roles
-             local lockedRole = lockedDistanceRoles[player] -- Look up the stored distance role string
-             print("DEBUG: Applying Distance Locked Rule (Priority 4) for", player.Name, "Locked Role:", lockedRole)
-
+             local lockedRole = lockedDistanceRoles[player]
              if lockedRole then
                   if lockedRole == "Killer" then
-                       print("DEBUG: Tagging", player.Name, "as KILLER (by locked distance).")
                        tagPlayer(player, killerColor, killerLabel)
                   elseif lockedRole == "Innocent" then
-                       print("DEBUG: Tagging", player.Name, "as INNOCENT (by locked distance).")
                        tagPlayer(player, innocentColor, innocentLabel)
                   end
              else
-                 -- Player somehow valid but not in lockedDistanceRoles - safety clear
                  clearOldStuff(player.Character)
-                 print("DEBUG: Player", player.Name, "valid but not in lockedDistanceRoles. Clearing.")
              end
 
          -- Priority 5: Vigilante + Hint Match (Purple)
-         -- Apply this tag if the player matches hints AND has a vigilante weapon.
-         print("DEBUG: Checking Vigilante + Hint Match condition (Priority 5) for", player.Name, ": playersMatchingHints[player] =", playersMatchingHints[player] ~= nil, ", playersWithVigilanteWeapons[player] =", playersWithVigilanteWeapons[player] ~= nil)
-         -- REMOVED: 'and not firstVigilanteTracker[player]' to tag ALL matching vigilantes
          elseif playersMatchingHints[player] and playersWithVigilanteWeapons[player] then
-              print("DEBUG: Applying VIGILANTE + HINT MATCH tag for", player.Name, ". Condition met.")
               tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
 
 
          elseif playersMatchingHints[player] and not firstVigilanteTracker[player] then
-             -- Priority 6: Hint Matching Yellow Color (Original Priority 4)
-             -- Tag yellow if matches hints AND is *not* the first detected Vigilante (to avoid overriding Cyan tag)
-             -- This priority is now below the purple tag, so a matching vigilante gets purple.
-             print("DEBUG: Applying HINT MATCH tag (Yellow) (Priority 6) for", player.Name, ". Condition met.")
+             -- Priority 6: Hint Matching Yellow Color
              tagPlayer(player, hintMatchColor, hintMatchLabel)
 
 
          else
-             -- Priority 7: Standard detection (Original Priority 5)
+             -- Priority 7: Standard detection
              local toolsByName = collectPlayerTools(player)
              local standardRole, standardColor, standardLabel = getStandardRoleFromWeapons(toolsByName)
-             print("DEBUG: Applying Standard Detection (Priority 7) for", player.Name, ". Standard Role:", standardLabel)
              if standardRole then
                  tagPlayer(player, standardColor, standardLabel)
              else
@@ -966,8 +842,7 @@ for _, player in ipairs(Players:GetPlayers()) do
          end
 
     else
-        -- Players not in playersWithValidCharacters were handled in Pass 1 (cleared)
-        print("DEBUG: Skipping tagging for", player.Name, " (not a valid target)")
+        clearOldStuff(player.Character)
     end
 end
 
@@ -983,7 +858,7 @@ print("Blood Debt Role Detector: ESP Disabled")
 -- Clear state variables
     rolesLockedByDistance = false
     lockedDistanceRoles = {}
-    playersMatchingHints = {} -- Clear hint matches
+    playersMatchingHints = {}
     -- Do NOT clear firstVigilanteTracker, it should persist across disable/enable
 
     -- Disconnect the main PlayerAdded connection
@@ -994,7 +869,6 @@ print("Blood Debt Role Detector: ESP Disabled")
 
     -- Disconnect hint text signal
     if hintTextConnection then
-        print("DEBUG: Disconnecting hintTextConnection during disable.")
         hintTextConnection:Disconnect()
         hintTextConnection = nil
     end
@@ -1194,7 +1068,5 @@ Content = "Attempted to create UI elements. Check output for details.",
 Duration = 5,
 Image = 4483362458 -- Replace with a suitable asset ID
 })
-
--- The Z Key Bind Functionality from the original large script was removed as it was commented out.
 
 -- End of Script
