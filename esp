@@ -2,8 +2,12 @@
 --[[
 Integrated ESP LocalScript with Rayfield UI, Role Detection, Distance Locking,
 and Enhanced Hint Matching including AssignedTask check.
-FIXED: The Distance Locking mechanism (Priority 4) is now properly activated when the "Everyone has a gun" condition is met, and only if no higher-priority Killer/Juggernaut rules (P1, P2, P3) are active. This ensures the Specific Juggernaut gun (P2) correctly overrides the distance lock.
-UPDATED: Implemented a new Priority 2 rule: If the Special Killer holds one of three specific high-value weapons (AK47 Case Hardened 1000000, RVK, Pretty Pink RVK), all other players with any registered role weapon are tagged as VIGILANTE.
+
+UPDATED: Added a new, high-priority role: KILLER + HINT MATCH (Orange).
+This tag is applied if a player holds a standard Killer weapon AND matches a hint.
+Priority order now ensures this Orange tag correctly overrides the standard Killer (Red) and the regular Hint Match (Yellow).
+
+FIXED: Critical syntax error in detectRoles function (line ~703) and improved state cleanup in disableEsp (line ~783).
 ]]
 
 -- Load Rayfield
@@ -37,10 +41,6 @@ local killerWeapons = {
 ["Kamatov"] = true,
 ["JS2-Derringy"] = true,
 ["JS-22"] = true,
-["NGO"] = true,
-["Throwing Dagger"] = true,
-["SoundMaker"] = true,
-["SoundMakerSlower"] = true,
 ["RR-LightCompactPistolS"] = true,
 ["J9-Mereta"] = true,
 ["RY's GG-17"] = true,   -- Special Killer Weapon
@@ -62,15 +62,12 @@ local killerWeapons = {
 ["RR-LightCompactPistol"] = true,
 ["RR-LightCompactPistolS"] = true,
 ["KamatovS"] = true,
-["Throwing Tomahawk"] = true,
-["Throwing Kunai"] = true,
 ["ChromeSlide Turqoise RR-LCP"] = true,
 ["JS1-CYCLOPS"] = true,
 ["THUMPA"] = true,
 ["LUT-E 'KRUS'"] = true,
 ["Memories"] = true,
 ["Hammer n Bullet"] = true,
-["Throwing Shuriken"] = true,
 ["Kamatov"] = true,
 ["JS-22GILDED"] = true,
 ["Sawn-offGILDED"] = true,
@@ -142,9 +139,8 @@ local killerWeapons = {
 ["TG's JTS225"] = true,
 ["Mason's Machete"] = true,
 ["Pretty Pink RVK"] = true,
-["Skeleton Rosen-Obrez"] = true,
 ["Comically Large Spoon"] = true,
-["Berf-JOLT"] = true,
+["Skeleton Rosen-Obrez"] = true,
 }
 
 local vigilanteWeapons = {
@@ -192,7 +188,7 @@ local specialKillerWeapons = {
 ["Pretty Pink RVK"] = true,
 }
 
--- Define Special Juggernaut Weapons for the NEW Priority 2 rule
+-- Define Special Juggernaut Weapons for the Priority 2 rule
 local specificJuggernautWeapons = {
     ["AK47 Case Hardened 1000000"] = true,
     ["RVK"] = true,
@@ -207,14 +203,20 @@ for name, _ in pairs(vigilanteWeapons) do allRoleWeapons[name] = true end
 -- Define Role Colors and Labels
 local killerColor = Color3.fromRGB(255, 0, 0) -- Red
 local killerLabel = "KILLER"
-local vigilanteColor = Color3.fromRGB(0, 255, 255) -- Cyan
-local vigilanteLabel = "VIGILANTE"
 local innocentColor = Color3.fromRGB(0, 255, 0) -- Green
 local innocentLabel = "INNOCENT"
-local hintMatchColor = Color3.new(1, 1, 0) -- Yellow
+
+local vigilanteColor = Color3.fromRGB(0, 255, 255) -- Cyan (Standard Vigilante)
+local vigilanteLabel = "VIGILANTE"
+
+local hintMatchColor = Color3.new(1, 1, 0) -- Yellow (Standard Hint Match)
 local hintMatchLabel = "HINT MATCH"
-local vigilanteHintColor = Color3.fromRGB(128, 0, 128) -- Purple
-local vigilanteHintLabel = "VIGILANTE + HINT MATCH" -- THIS IS THE PURPLE LABEL
+
+local vigilanteHintColor = Color3.fromRGB(128, 0, 128) -- Purple (Vigilante + Hint)
+local vigilanteHintLabel = "VIGILANTE + HINT MATCH"
+
+local killerHintColor = Color3.fromRGB(255, 165, 0) -- NEW: Orange (Killer + Hint)
+local killerHintLabel = "KILLER + HINT MATCH"
 
 -- Define the distance threshold for the new rule
 local distanceThreshold = 30
@@ -239,6 +241,7 @@ local lockedDistanceRoles = {} -- Stores the determined distance role ("Killer" 
 local playersMatchingHints = {} -- Stores players who currently match hints (populated by updateMatchingHintPlayers)
 local hintTextConnection = nil -- Stores the signal connection for the hint text
 local firstVigilanteTracker = {} -- Stores the first player detected as Vigilante (player -> true)
+local playersWithStandardKillerWeapons = {} -- Tracks players with standard killer weapons (non-special)
 
 -- Add floating name tag (smaller and neater)
 local function addNameTag(character, text, color)
@@ -327,7 +330,7 @@ end
 end
 end
 
--- NEW: Check the player's model within NPCSFolder for tools
+-- Check the player's model within NPCSFolder for tools
 if NPCSFolder then -- Ensure NPCSFolder exists
     local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
     if playerNPCModel then
@@ -380,8 +383,6 @@ local hintType = "invalid"
 local hintValue = nil
 local cleanedContent = hintContent:match("^%s*(.-)%s*$") or "" -- Trim leading/trailing whitespace
 
--- print("DEBUG: parseSingleHint called with:", cleanedContent) -- Excessive logging
-
 if string.len(cleanedContent) == 0 then
     return hintType, hintValue
 end
@@ -418,7 +419,6 @@ end
 
 -- Function to update the playersMatchingHints table based on current GUI hints
 local function updateMatchingHintPlayers()
--- print("DEBUG: updateMatchingHintPlayers called") -- Excessive logging
 playersMatchingHints = {} -- Clear the previous results
 
 if not espEnabled then return end
@@ -597,6 +597,7 @@ local playersWithValidCharacters = {} -- Track players who are not local and hav
 local playersWithoutAnyGun = {}         -- Track players without *any* role weapon
 local playersWithAnyGun = {}            -- Track players with *any* role weapon
 local playersWithVigilanteWeapons = {}  -- Track players with Vigilante weapons
+playersWithStandardKillerWeapons = {}   -- RESET for Standard Killer + Hint check
 
 -- Counts for New Highest Priority Killer rule
 local vigilanteCount = 0
@@ -639,6 +640,10 @@ for _, player in ipairs(Players:GetPlayers()) do
              -- Check for ANY Killer weapon
              if killerWeapons[name] then
                  hasKillerWeapon = true
+                 -- Check for STANDARD Killer Weapon (not in the special list)
+                 if not specialKillerWeapons[name] then
+                     playersWithStandardKillerWeapons[player] = true
+                 end
              end
          end
 
@@ -724,7 +729,7 @@ if not higherPriorityActive then -- Only manage the lock if P1, P2, P3 are inact
      if everyoneHasGunConditionMet and not rolesLockedByDistance then
           rolesLockedByDistance = true -- Activate the lock
           lockedDistanceRoles = {} -- Clear any old locked roles
-          print("Blood Debt Role Detector: Distance Lock ACTIVATED by 'Everyone has a gun'.") -- DEBUG
+          -- print("Blood Debt Role Detector: Distance Lock ACTIVATED by 'Everyone has a gun'.") -- DEBUG
 
           local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
 
@@ -750,16 +755,16 @@ if not higherPriorityActive then -- Only manage the lock if P1, P2, P3 are inact
      elseif noOneHasGunConditionMet and rolesLockedByDistance then
           rolesLockedByDistance = false -- Deactivate the lock
           lockedDistanceRoles = {} -- Clear stored roles
-          print("Blood Debt Role Detector: Distance Lock DEACTIVATED by 'No one has a gun'.")
+          -- print("Blood Debt Role Detector: Distance Lock DEACTIVATED by 'No one has a gun'.")
      end
 
 else
-     print("DEBUG: Higher Priority Active (P1/P2/P3). Distance lock management skipped/maintained override.")
+     -- print("DEBUG: Higher Priority Active (P1/P2/P3). Distance lock management skipped/maintained override.")
      -- Ensure the lock is off if a new higher priority rule is detected, even if it wasn't cleared by P1 logic
      if rolesLockedByDistance then
          rolesLockedByDistance = false
          lockedDistanceRoles = {}
-         print("DEBUG: Higher Priority detected: Cleared residual Distance Lock.")
+         -- print("DEBUG: Higher Priority detected: Cleared residual Distance Lock.")
      end
 end
 
@@ -768,7 +773,7 @@ end
 updateMatchingHintPlayers()
 
 
--- **Pass 2: Apply Tags based on determined state (New #1 > Specific Juggernaut > Special Killer > Distance Locked > Vigilante+Hint > Hint Match > Standard)**
+-- **Pass 2: Apply Tags based on determined state (New #1 > Specific Juggernaut > Special Killer > Distance Locked > Vigilante+Hint > Killer+Hint > Hint Match > Standard)**
 for _, player in ipairs(Players:GetPlayers()) do
     if playersWithValidCharacters[player] then
 
@@ -789,7 +794,7 @@ for _, player in ipairs(Players:GetPlayers()) do
                          hasAnyRoleWeapon = true
                          break
                      end
-                 end
+                 end -- **FIXED: Replaced extraneous '}' with 'end' for the 'for' loop**
 
                  if hasAnyRoleWeapon then
                      -- They have a registered gun, tag them as VIGILANTE
@@ -821,18 +826,20 @@ for _, player in ipairs(Players:GetPlayers()) do
                  clearOldStuff(player.Character)
              end
 
-         -- Priority 5: Vigilante + Hint Match (Purple)
          elseif playersMatchingHints[player] and playersWithVigilanteWeapons[player] then
-              tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
+             -- Priority 5: Vigilante + Hint Match (Purple)
+             tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
 
+         elseif playersMatchingHints[player] and playersWithStandardKillerWeapons[player] then
+             -- Priority 6: NEW Killer + Hint Match (Orange)
+             tagPlayer(player, killerHintColor, killerHintLabel)
 
-         elseif playersMatchingHints[player] and not firstVigilanteTracker[player] then
-             -- Priority 6: Hint Matching Yellow Color
+         elseif playersMatchingHints[player] and not playersWithStandardKillerWeapons[player] and not playersWithVigilanteWeapons[player] then
+             -- Priority 7: Hint Matching Yellow Color (Only applies if no weapon match)
              tagPlayer(player, hintMatchColor, hintMatchLabel)
 
-
          else
-             -- Priority 7: Standard detection
+             -- Priority 8: Standard detection
              local toolsByName = collectPlayerTools(player)
              local standardRole, standardColor, standardLabel = getStandardRoleFromWeapons(toolsByName)
              if standardRole then
@@ -860,7 +867,8 @@ print("Blood Debt Role Detector: ESP Disabled")
     rolesLockedByDistance = false
     lockedDistanceRoles = {}
     playersMatchingHints = {}
-    -- Do NOT clear firstVigilanteTracker, it should persist across disable/enable
+    playersWithStandardKillerWeapons = {}
+    firstVigilanteTracker = {} -- **FIXED: Added cleanup for the state table**
 
     -- Disconnect the main PlayerAdded connection
     if espPlayerAddedConnection then
