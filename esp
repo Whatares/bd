@@ -141,6 +141,7 @@ local killerWeapons = {
 ["Pretty Pink RVK"] = true,
 ["Comically Large Spoon"] = true,
 ["Skeleton Rosen-Obrez"] = true,
+["Berf-JOLT"] = true,
 }
 
 local vigilanteWeapons = {
