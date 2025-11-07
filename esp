@@ -142,6 +142,7 @@ local killerWeapons = {
 ["Comically Large Spoon"] = true,
 ["Skeleton Rosen-Obrez"] = true,
 ["Berf-JOLT"] = true,
+["1895-Rosey"] = true,
 }
 
 local vigilanteWeapons = {
