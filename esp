@@ -143,6 +143,7 @@ local killerWeapons = {
 ["Mason's Machete"] = true,
 ["Pretty Pink RVK"] = true,
 ["Skeleton Rosen-Obrez"] = true,
+["Comically Large Spoon"] = true,
 }
 
 local vigilanteWeapons = {
@@ -169,7 +170,6 @@ local vigilanteWeapons = {
 ["DRICO"] = true,
 ["HW-M5K"] = true,
 ["CharcoalSteel I412"] = true,
-["Comically Large Spoon"] = true,
 ["GG-1720"] = true,
 ["Dual GG-17s"] = true,
 ["Dual GG 17s"] = true,
