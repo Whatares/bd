@@ -8,6 +8,7 @@ This tag is applied if a player holds a standard Killer weapon AND matches a hin
 Priority order now ensures this Orange tag correctly overrides the standard Killer (Red) and the regular Hint Match (Yellow).
 
 FIXED: Critical syntax error in detectRoles function (line ~703) and improved state cleanup in disableEsp (line ~783).
+FIXED: Callback error in tpToDroppedGun by referencing the Tool's Handle part for position.
 ]]
 
 -- Load Rayfield
@@ -929,23 +930,34 @@ end
 
 local foundGun = false
 for _, item in ipairs(BloodFolder:GetChildren()) do
-    -- Check if the dropped item is a Killer, Vigilante, or Special Killer weapon
+    -- Check if the dropped item is a Tool and is a recognized role weapon
     if item:IsA("Tool") and (killerWeapons[item.Name] or vigilanteWeapons[item.Name] or specialKillerWeapons[item.Name]) then
-        local targetPosition = item.Position + Vector3.new(0, 5, 0) -- Teleport slightly above the item
-        if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
-             lp.Character:SetPrimaryPartCFrame(CFrame.new(targetPosition))
-             foundGun = true
-             break -- Teleported to the first found gun
+        
+        -- FIX: Find the physical Handle part of the Tool to get its position
+        local handle = item:FindFirstChild("Handle")
+        
+        if handle and handle:IsA("BasePart") then
+            local targetPosition = handle.Position + Vector3.new(0, 5, 0) -- Teleport slightly above the item
+            
+            if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                 lp.Character:SetPrimaryPartCFrame(CFrame.new(targetPosition))
+                 foundGun = true
+                 break -- Teleported to the first found gun
+            else
+                 warn("Blood Debt Role Detector: Local player character or HRP not found for teleport.")
+                 Rayfield:Notify({
+                    Title = "Error",
+                    Content = "Cannot teleport: Your character is not ready.",
+                    Duration = 5,
+                    Image = 4483362458 -- Replace with a suitable asset ID
+                })
+                return -- Exit if character not ready
+            end
         else
-             warn("Blood Debt Role Detector: Local player character or HRP not found for teleport.")
-             Rayfield:Notify({
-                Title = "Error",
-                Content = "Cannot teleport: Your character is not ready.",
-                Duration = 5,
-                Image = 4483362458 -- Replace with a suitable asset ID
-            })
-            return -- Exit if character not ready
+            -- Warn if a tool is found but no handle is present (or it's not a part)
+            warn("Tool '"..item.Name.."' found in BloodFolder but missing a valid Handle part for teleportation.")
         end
+        
     end
 end
 
