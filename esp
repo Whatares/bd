@@ -1,14 +1,12 @@
 --NU-FWQ
 --[[
 Integrated ESP LocalScript with Rayfield UI, Role Detection, Distance Locking,
-and Enhanced Hint Matching including AssignedTask check.
+Enhanced Hint Matching, and CUSTOMIZABLE NAMETAGS (Role/Username/Character Name).
 
-UPDATED: Added a new, high-priority role: KILLER + HINT MATCH (Orange).
-This tag is applied if a player holds a standard Killer weapon AND matches a hint.
-Priority order now ensures this Orange tag correctly overrides the standard Killer (Red) and the regular Hint Match (Yellow).
-
-FIXED: Critical syntax error in detectRoles function (line ~703) and improved state cleanup in disableEsp (line ~783).
-FIXED: Callback error in tpToDroppedGun by referencing the Tool's Handle part for position.
+UPDATED: Added dropdown menu to select nametag display mode:
+- Role (Default): Shows the detected role
+- Username: Shows the player's Roblox username
+- Character Name: Shows the in-game character name from NPCSFolder
 ]]
 
 -- Load Rayfield
@@ -16,1083 +14,1028 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- Create the window
 local Window = Rayfield:CreateWindow({
-Name = "Blood Debt Role Detector",
-Icon = 0,
-LoadingTitle = "Rayfield Role Detector",
-LoadingSubtitle = "by Sirius",
-Theme = "Default",
-DisableRayfieldPrompts = false,
-DisableBuildWarnings = false,
-ConfigurationSaving = {
-Enabled = true,
-FolderName = nil,
-FileName = "Big Hub"
-}
+    Name = "Blood Debt Role Detector",
+    Icon = 0,
+    LoadingTitle = "Rayfield Role Detector",
+    LoadingSubtitle = "by Sirius",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Big Hub"
+    }
 })
 
 -- Create the tab
 local Tab = Window:CreateTab("Players", "rewind")
 
--- Weapon lists (UPDATED AS PROVIDED in the larger script)
+-- NEW: Nametag display mode variable
+local nametagMode = "Role" -- Options: "Role", "Username", "Character Name"
+
+-- Weapon lists
 local killerWeapons = {
-["CharcoalSteel JS-22"] = true,
-["Pretty Pink RR-LCP"] = true,
-["JS2-BondsDerringy"] = true,
-["GILDED"] = true,
-["Kamatov"] = true,
-["JS2-Derringy"] = true,
-["JS-22"] = true,
-["RR-LightCompactPistolS"] = true,
-["J9-Mereta"] = true,
-["RY's GG-17"] = true,   -- Special Killer Weapon
-["RR-LCP"] = true,
-["JS1-Competitor"] = true,
-["AT's KAR15"] = true,  -- Special Killer Weapon
-["VK's ANKM"] = true,    -- Special Killer Weapon
-["Clothed Sawn-off"] = true,
-["Sawn-off"] = true,
-["Clothed Rosen-Obrez"] = true,
-["Rosen-Obrez"] = true,
-["GraySteel K1911"] = true,
-["DarkSteel K1911"] = true,
-["SilverSteel K1911"] = true,
-["K1911"] = true,
-["ZZ-90"] = true,
-["SKORPION"] = true,
-["Mares Leg"] = true, -- Added
-["RR-LightCompactPistol"] = true,
-["RR-LightCompactPistolS"] = true,
-["KamatovS"] = true,
-["ChromeSlide Turqoise RR-LCP"] = true,
-["JS1-CYCLOPS"] = true,
-["THUMPA"] = true,
-["LUT-E 'KRUS'"] = true,
-["Memories"] = true,
-["Hammer n Bullet"] = true,
-["Kamatov"] = true,
-["JS-22GILDED"] = true,
-["Sawn-offGILDED"] = true,
-["Door'bler TIGERSTRIPES"] = true,
-["Anatoly's JS-22"] = true,
-["PLASTIC JS-22"] = true,
-["JTS225-OBREZ"] = true,
-["HEARDBALLA"] = true,
-["Whiteout Rosen-Obrez"] = true,
-["Whiteout RR-LCP"] = true,
-["JTS225-Obrez Monochrome"] = true,
-["JTS225-Obrez"] = true,
-["Sawn-off10"] = true,
-["Nikolai's 'Dented'"] = true,
-["JS-44"] = true,
-["BandagePack"] = true,
-["JTS225-Obrez Poly"] = true,
-["Mares Leg10"] = true,
-["RR-LCP10"] = true,
-["JTS225-Obrez Partycannon"] = true,
-["Bandages"] = true,
-["corrodedmetal JS-22"] = true,
-["CharcoalSteel JS-44"] = true,
-["SKORPION10"] = true,
-["Meretta486Palubu Sawn-Off"] = true,
-["KamatovDRUM"] = true,
-["Micro KZI"] = true,
-["Whiteout RR-LightCompactPistolS"] = true,
-["Clothed SKORPION"] = true,
-["CharcoalSteel SKORPION"] = true,
-["Charcoal Steel SKORPION"] = true,
-["Katya's 'Memories'"] = true,
-["Dual SKORPS"] = true,
-["HWISSH-KP9"] = true,
-["JS2-DerringyGILDED"] = true,
-["K1911GILDED"] = true,
-["Mandols-5"] = true,
-["RDG-2B"] = true,
-["Testament"] = true,
-["Jolibri"] = true,
-["JAVELIN-OBREZS"] = true,
-["GZhG-7.62"] = true,
-["AGM22"] = true,
-["RR-Mark2"] = true,
-["Dual LCPs"] = true,
-["RR-LightCompactPistolS10"] = true,
-["Cloth"] = true,
-["Wild Mandols-5"] = true,
-["AK47 Case Hardened 1000000"] = true,
-["Kensington20"] = true,
-["Kensington"] = true,
-["ZOZ-106"] = true,
-["Whizz"] = true,
-["Rosen Nagan"] = true,
-["WISP"] = true,
-["WISP Pearl"] = true,
-["MAK-1020"] = true,
-["SKORPION 'AMIRNOV"] = true,
-["ZOZ-106"] = true,
-["PTRB-41"] = true,
-["Memorial"] = true,
-["Mooser"] = true,
-["VA's ANKM"] = true,
-["HW-K7"] = true,
-["TG's JAVELIN-ZVD"] = true,
-["KR7S"] = true,
-["RUZKH-12"] = true,
-["TEKE-9"] = true,
-["TG's JTS225"] = true,
-["Mason's Machete"] = true,
-["Pretty Pink RVK"] = true,
-["Comically Large Spoon"] = true,
-["Skeleton Rosen-Obrez"] = true,
-["Berf-JOLT"] = true,
-["1895-Rosey"] = true,
-["K1911 'Memorial'"] = true,
-["APZ"] = true,
+    ["CharcoalSteel JS-22"] = true,
+    ["Pretty Pink RR-LCP"] = true,
+    ["JS2-BondsDerringy"] = true,
+    ["GILDED"] = true,
+    ["Kamatov"] = true,
+    ["JS2-Derringy"] = true,
+    ["JS-22"] = true,
+    ["RR-LightCompactPistolS"] = true,
+    ["J9-Mereta"] = true,
+    ["RY's GG-17"] = true,
+    ["RR-LCP"] = true,
+    ["JS1-Competitor"] = true,
+    ["AT's KAR15"] = true,
+    ["VK's ANKM"] = true,
+    ["Clothed Sawn-off"] = true,
+    ["Sawn-off"] = true,
+    ["Clothed Rosen-Obrez"] = true,
+    ["Rosen-Obrez"] = true,
+    ["GraySteel K1911"] = true,
+    ["DarkSteel K1911"] = true,
+    ["SilverSteel K1911"] = true,
+    ["K1911"] = true,
+    ["ZZ-90"] = true,
+    ["SKORPION"] = true,
+    ["Mares Leg"] = true,
+    ["RR-LightCompactPistol"] = true,
+    ["KamatovS"] = true,
+    ["ChromeSlide Turqoise RR-LCP"] = true,
+    ["JS1-CYCLOPS"] = true,
+    ["THUMPA"] = true,
+    ["LUT-E 'KRUS'"] = true,
+    ["Memories"] = true,
+    ["Hammer n Bullet"] = true,
+    ["JS-22GILDED"] = true,
+    ["Sawn-offGILDED"] = true,
+    ["Door'bler TIGERSTRIPES"] = true,
+    ["Anatoly's JS-22"] = true,
+    ["PLASTIC JS-22"] = true,
+    ["JTS225-OBREZ"] = true,
+    ["HEARDBALLA"] = true,
+    ["Whiteout Rosen-Obrez"] = true,
+    ["Whiteout RR-LCP"] = true,
+    ["JTS225-Obrez Monochrome"] = true,
+    ["JTS225-Obrez"] = true,
+    ["Sawn-off10"] = true,
+    ["Nikolai's 'Dented'"] = true,
+    ["JS-44"] = true,
+    ["BandagePack"] = true,
+    ["JTS225-Obrez Poly"] = true,
+    ["Mares Leg10"] = true,
+    ["RR-LCP10"] = true,
+    ["JTS225-Obrez Partycannon"] = true,
+    ["Bandages"] = true,
+    ["corrodedmetal JS-22"] = true,
+    ["CharcoalSteel JS-44"] = true,
+    ["SKORPION10"] = true,
+    ["Meretta486Palubu Sawn-Off"] = true,
+    ["KamatovDRUM"] = true,
+    ["Micro KZI"] = true,
+    ["Whiteout RR-LightCompactPistolS"] = true,
+    ["Clothed SKORPION"] = true,
+    ["CharcoalSteel SKORPION"] = true,
+    ["Charcoal Steel SKORPION"] = true,
+    ["Katya's 'Memories'"] = true,
+    ["Dual SKORPS"] = true,
+    ["HWISSH-KP9"] = true,
+    ["JS2-DerringyGILDED"] = true,
+    ["K1911GILDED"] = true,
+    ["Mandols-5"] = true,
+    ["RDG-2B"] = true,
+    ["Testament"] = true,
+    ["Jolibri"] = true,
+    ["JAVELIN-OBREZS"] = true,
+    ["GZhG-7.62"] = true,
+    ["AGM22"] = true,
+    ["RR-Mark2"] = true,
+    ["Dual LCPs"] = true,
+    ["RR-LightCompactPistolS10"] = true,
+    ["Cloth"] = true,
+    ["Wild Mandols-5"] = true,
+    ["AK47 Case Hardened 1000000"] = true,
+    ["Kensington20"] = true,
+    ["Kensington"] = true,
+    ["ZOZ-106"] = true,
+    ["Whizz"] = true,
+    ["Rosen Nagan"] = true,
+    ["WISP"] = true,
+    ["WISP Pearl"] = true,
+    ["MAK-1020"] = true,
+    ["SKORPION 'AMIRNOV"] = true,
+    ["PTRB-41"] = true,
+    ["Memorial"] = true,
+    ["Mooser"] = true,
+    ["VA's ANKM"] = true,
+    ["HW-K7"] = true,
+    ["TG's JAVELIN-ZVD"] = true,
+    ["KR7S"] = true,
+    ["RUZKH-12"] = true,
+    ["TEKE-9"] = true,
+    ["TG's JTS225"] = true,
+    ["Mason's Machete"] = true,
+    ["Pretty Pink RVK"] = true,
+    ["Comically Large Spoon"] = true,
+    ["Skeleton Rosen-Obrez"] = true,
+    ["Berf-JOLT"] = true,
+    ["1895-Rosey"] = true,
+    ["K1911 'Memorial'"] = true,
+    ["APZ"] = true,
 }
 
 local vigilanteWeapons = {
-["Beagle"] = true,
-["Paradise Beagle"] = true,
-["IZVEKH-412"] = true,
-["SilverSteel RR-Snubby"] = true,
-["RR-Snubby"] = true,
-["ZKZ-Obrez"] = true,
-["GG-17"] = true,
-["J9-M"] = true,
-["J9-Meretta"] = true, -- Typo? Should this be J9-Mereta? Keeping as is from
-["Pretty Pink GG-17"] = true, -- Added
-["GG-17 TAN"] = true, -- Added
-["GG-17GILDED"] = true, -- Added
-["RR-SnubbyGILDED"] = true, -- Added
-["HWISSH-226"] = true, -- Added
-["ZKZ-Obrez10"] = true, -- Added
-["Buxxberg-COMPACT"] = true,
-["Pretty Pink Buxxberg-COMPACT"] = true,
-["JS-5A-Obrez"] = true,
-["Dual Elites"] = true,
-["RR-Snubby10"] = true,
-["DRICO"] = true,
-["HW-M5K"] = true,
-["CharcoalSteel I412"] = true,
-["GG-1720"] = true,
-["Dual GG-17s"] = true,
-["Dual GG 17s"] = true,
-["Mini Ranch Rifle"] = true,
-["Clothed ZKZ-Obrez"] = true,
-["Case Hardened DRICO"] = true,
+    ["Beagle"] = true,
+    ["Paradise Beagle"] = true,
+    ["IZVEKH-412"] = true,
+    ["SilverSteel RR-Snubby"] = true,
+    ["RR-Snubby"] = true,
+    ["ZKZ-Obrez"] = true,
+    ["GG-17"] = true,
+    ["J9-M"] = true,
+    ["J9-Meretta"] = true,
+    ["Pretty Pink GG-17"] = true,
+    ["GG-17 TAN"] = true,
+    ["GG-17GILDED"] = true,
+    ["RR-SnubbyGILDED"] = true,
+    ["HWISSH-226"] = true,
+    ["ZKZ-Obrez10"] = true,
+    ["Buxxberg-COMPACT"] = true,
+    ["Pretty Pink Buxxberg-COMPACT"] = true,
+    ["JS-5A-Obrez"] = true,
+    ["Dual Elites"] = true,
+    ["RR-Snubby10"] = true,
+    ["DRICO"] = true,
+    ["HW-M5K"] = true,
+    ["CharcoalSteel I412"] = true,
+    ["GG-1720"] = true,
+    ["Dual GG-17s"] = true,
+    ["Dual GG 17s"] = true,
+    ["Mini Ranch Rifle"] = true,
+    ["Clothed ZKZ-Obrez"] = true,
+    ["Case Hardened DRICO"] = true,
 }
 
--- Define Special Killer weapons (for the global check)
 local specialKillerWeapons = {
-["RY's GG-17"] = true,
-["AT's KAR15"] = true,
-["VK's ANKM"] = true,
-["VA's ANKM"] = true,
-["RVK"] = true,
-["GZhG-7.62"] = true,
-["AK47 Case Hardened 1000000"] = true,
-["TG's JAVELIN-ZVD"] = true,
-["Mason's Machete"] = true,
-["Pretty Pink RVK"] = true,
+    ["RY's GG-17"] = true,
+    ["AT's KAR15"] = true,
+    ["VK's ANKM"] = true,
+    ["VA's ANKM"] = true,
+    ["RVK"] = true,
+    ["GZhG-7.62"] = true,
+    ["AK47 Case Hardened 1000000"] = true,
+    ["TG's JAVELIN-ZVD"] = true,
+    ["Mason's Machete"] = true,
+    ["Pretty Pink RVK"] = true,
 }
 
--- Define Special Juggernaut Weapons for the Priority 2 rule
 local specificJuggernautWeapons = {
     ["AK47 Case Hardened 1000000"] = true,
     ["RVK"] = true,
     ["Pretty Pink RVK"] = true,
 }
 
--- Define a combined list of all relevant weapons
 local allRoleWeapons = {}
 for name, _ in pairs(killerWeapons) do allRoleWeapons[name] = true end
 for name, _ in pairs(vigilanteWeapons) do allRoleWeapons[name] = true end
 
 -- Define Role Colors and Labels
-local killerColor = Color3.fromRGB(255, 0, 0) -- Red
+local killerColor = Color3.fromRGB(255, 0, 0)
 local killerLabel = "KILLER"
-local innocentColor = Color3.fromRGB(0, 255, 0) -- Green
+local innocentColor = Color3.fromRGB(0, 255, 0)
 local innocentLabel = "INNOCENT"
-
-local vigilanteColor = Color3.fromRGB(0, 255, 255) -- Cyan (Standard Vigilante)
+local vigilanteColor = Color3.fromRGB(0, 255, 255)
 local vigilanteLabel = "VIGILANTE"
-
-local hintMatchColor = Color3.new(1, 1, 0) -- Yellow (Standard Hint Match)
+local hintMatchColor = Color3.new(1, 1, 0)
 local hintMatchLabel = "HINT MATCH"
-
-local vigilanteHintColor = Color3.fromRGB(128, 0, 128) -- Purple (Vigilante + Hint)
+local vigilanteHintColor = Color3.fromRGB(128, 0, 128)
 local vigilanteHintLabel = "VIGILANTE + HINT MATCH"
-
-local killerHintColor = Color3.fromRGB(255, 165, 0) -- NEW: Orange (Killer + Hint)
+local killerHintColor = Color3.fromRGB(255, 165, 0)
 local killerHintLabel = "KILLER + HINT MATCH"
 
--- Define the distance threshold for the new rule
 local distanceThreshold = 30
 
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local NPCSFolder = Workspace:WaitForChild("NPCSFolder") -- Ensure NPCSFolder is waited for
-local BloodFolder = Workspace:WaitForChild("BloodFolder") -- Ensure BloodFolder is waited for
+local NPCSFolder = Workspace:WaitForChild("NPCSFolder")
+local BloodFolder = Workspace:WaitForChild("BloodFolder")
 
--- State variables for controlling ESP
+-- State variables
 local espEnabled = false
-local stopEspLoop = false -- Signal to stop the detection loop
-local espPlayerAddedConnection = nil -- Store the main PlayerAdded connection
-local espCharacterAddedConnections = {} -- Store per-player CharacterAdded connections
+local stopEspLoop = false
+local espPlayerAddedConnection = nil
+local espCharacterAddedConnections = {}
+local rolesLockedByDistance = false
+local lockedDistanceRoles = {}
+local playersMatchingHints = {}
+local hintTextConnection = nil
+local firstVigilanteTracker = {}
+local playersWithStandardKillerWeapons = {}
 
--- State variables for the distance locking rule (PERSIST ACROSS DETECTROLES CALLS)
-local rolesLockedByDistance = false -- Flag indicating if distance roles are locked
-local lockedDistanceRoles = {} -- Stores the determined distance role ("Killer" or "Innocent")
+-- NEW: Function to get character name from NPCSFolder
+local function getCharacterName(player)
+    if NPCSFolder then
+        local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
+        if playerNPCModel then
+            -- Try multiple possible locations for the character name
+            
+            -- Check for a StringValue named "CharacterName" or similar
+            local charNameValue = playerNPCModel:FindFirstChild("CharacterName") 
+                or playerNPCModel:FindFirstChild("NPCName")
+                or playerNPCModel:FindFirstChild("Name")
+            
+            if charNameValue and charNameValue:IsA("StringValue") then
+                return charNameValue.Value
+            end
+            
+            -- Check in Configuration folder
+            local configObject = playerNPCModel:FindFirstChild("Configuration")
+            if configObject then
+                local nameInConfig = configObject:FindFirstChild("CharacterName")
+                    or configObject:FindFirstChild("NPCName")
+                    or configObject:FindFirstChild("Name")
+                
+                if nameInConfig and nameInConfig:IsA("StringValue") then
+                    return nameInConfig.Value
+                end
+            end
+            
+            -- Check for Humanoid's DisplayName
+            local humanoid = playerNPCModel:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.DisplayName ~= player.Name then
+                return humanoid.DisplayName
+            end
+        end
+    end
+    return player.Name -- Fallback to username if not found
+end
 
--- State variables for the Hint Matching rule
-local playersMatchingHints = {} -- Stores players who currently match hints (populated by updateMatchingHintPlayers)
-local hintTextConnection = nil -- Stores the signal connection for the hint text
-local firstVigilanteTracker = {} -- Stores the first player detected as Vigilante (player -> true)
-local playersWithStandardKillerWeapons = {} -- Tracks players with standard killer weapons (non-special)
+-- UPDATED: Add floating name tag with customizable text
+local function addNameTag(character, text, color, player)
+    local head = character:FindFirstChild("Head")
+    if not head then return end
 
--- Add floating name tag (smaller and neater)
-local function addNameTag(character, text, color)
-local head = character:FindFirstChild("Head")
-if not head then return end
+    local oldTag = head:FindFirstChild("RoleBillboard")
+    if oldTag then oldTag:Destroy() end
 
-local oldTag = head:FindFirstChild("RoleBillboard")
-if oldTag then oldTag:Destroy() end
+    -- Determine what text to display based on nametagMode
+    local displayText = text
+    if nametagMode == "Username" then
+        displayText = player.Name
+    elseif nametagMode == "Character Name" then
+        displayText = getCharacterName(player)
+    end
+    -- If nametagMode == "Role", displayText remains as the passed 'text' parameter
 
-local bb = Instance.new("BillboardGui")
-bb.Name = "RoleBillboard"
-bb.Size = UDim2.new(0, 100, 0, 20)
-bb.StudsOffset = Vector3.new(0, 2.5, 0)
-bb.Adornee = head
-bb.AlwaysOnTop = true
-bb.Parent = head
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "RoleBillboard"
+    bb.Size = UDim2.new(0, 100, 0, 20)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.Adornee = head
+    bb.AlwaysOnTop = true
+    bb.Parent = head
 
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, 0, 1, 0)
-label.BackgroundTransparency = 1
-label.Text = text
-label.TextColor3 = color
-label.TextStrokeTransparency = 0.2
-label.TextScaled = true
-label.Font = Enum.Font.SourceSansBold
-label.Parent = bb
-
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = displayText
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0.2
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+    label.Parent = bb
 end
 
 -- Clear previous overlays
 local function clearOldStuff(character)
-if not character then return end
+    if not character then return end
 
-local oldHighlight = character:FindFirstChild("RoleHighlight")
-if oldHighlight and oldHighlight:IsA("Highlight") then
-    oldHighlight:Destroy()
+    local oldHighlight = character:FindFirstChild("RoleHighlight")
+    if oldHighlight and oldHighlight:IsA("Highlight") then
+        oldHighlight:Destroy()
+    end
+
+    local head = character:FindFirstChild("Head")
+    if head then
+        local tag = head:FindFirstChild("RoleBillboard")
+        if tag then tag:Destroy() end
+    end
 end
 
-local head = character:FindFirstChild("Head")
-if head then
-    local tag = head:FindFirstChild("RoleBillboard")
-    if tag then tag:Destroy() end
-end
-
-end
-
--- Tag player by role
+-- UPDATED: Tag player by role (now passes player object for nametag customization)
 local function tagPlayer(player, roleColor, labelText)
-if not player.Character then return end
-clearOldStuff(player.Character)
+    if not player.Character then return end
+    clearOldStuff(player.Character)
 
-local highlight = Instance.new("Highlight", player.Character)
+    local highlight = Instance.new("Highlight", player.Character)
+    highlight.Name = "RoleHighlight"
+    highlight.Archivable = true
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = true
+    highlight.FillColor = roleColor
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
 
-highlight.Name = "RoleHighlight"
-highlight.Archivable = true
-highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-highlight.Enabled = true
-
-highlight.FillColor = roleColor
-highlight.OutlineColor = Color3.fromRGB(255, 255, 255) -- White outline
-highlight.FillTransparency = 0.5
-highlight.OutlineTransparency = 0
-
-if labelText then
-    addNameTag(player.Character, labelText, roleColor)
-end
-
+    if labelText then
+        addNameTag(player.Character, labelText, roleColor, player)
+    end
 end
 
 -- Helper function to collect a player's tools
 local function collectPlayerTools(player)
-local tools = {}
-local backpack = player:FindFirstChildOfClass("Backpack")
-if backpack then
-for _, tool in ipairs(backpack:GetChildren()) do
-if tool:IsA("Tool") then
-tools[tool.Name] = tool
-end
-end
-end
-if player.Character then
-for _, tool in ipairs(player.Character:GetChildren()) do
-if tool:IsA("Tool") then
-tools[tool.Name] = tool
-end
-end
+    local tools = {}
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                tools[tool.Name] = tool
+            end
+        end
+    end
+    if player.Character then
+        for _, tool in ipairs(player.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                tools[tool.Name] = tool
+            end
+        end
+    end
+
+    if NPCSFolder then
+        local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
+        if playerNPCModel then
+            for _, child in ipairs(playerNPCModel:GetChildren()) do
+                if child:IsA("Tool") then
+                    tools[child.Name] = child
+                end
+            end
+        end
+    end
+
+    return tools
 end
 
--- Check the player's model within NPCSFolder for tools
-if NPCSFolder then -- Ensure NPCSFolder exists
-    local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
-    if playerNPCModel then
-        for _, child in ipairs(playerNPCModel:GetChildren()) do
-            if child:IsA("Tool") then
-                tools[child.Name] = child -- Add tools found in the NPCSFolder model
+-- Helper function to get standard role based on weapons
+local function getStandardRoleFromWeapons(toolsByName)
+    local role = nil
+    local color = nil
+    local label = nil
+
+    for weaponName, _ in pairs(killerWeapons) do
+        if not specialKillerWeapons[weaponName] and toolsByName[weaponName] then
+            role = "Killer"
+            color = killerColor
+            label = killerLabel
+            return role, color, label
+        end
+    end
+
+    for weaponName, _ in pairs(vigilanteWeapons) do
+        if toolsByName[weaponName] then
+            role = "Vigilante"
+            color = vigilanteColor
+            label = vigilanteLabel
+            return role, color, label
+        end
+    end
+
+    return nil, nil, nil
+end
+
+-- Function to parse a single string of hint content
+local function parseSingleHint(hintContent)
+    local hintType = "invalid"
+    local hintValue = nil
+    local cleanedContent = hintContent:match("^%s*(.-)%s*$") or ""
+
+    if string.len(cleanedContent) == 0 then
+        return hintType, hintValue
+    end
+
+    local taskMatch = cleanedContent:match("^Is often seen%s*(.*)$")
+    if taskMatch then
+        hintType = "task"
+        hintValue = taskMatch:match("^%s*(.-)%s*$")
+        return hintType, hintValue
+    end
+
+    local traitBracketMatch = cleanedContent:match("^%[.-%]$")
+    if traitBracketMatch then
+        local cleanClue = traitBracketMatch:gsub("[%[%]]", ""):match("^%s*(.-)%s*$") or ""
+        if string.len(cleanClue) > 0 and cleanClue:lower() ~= "assigned task" and cleanClue:lower() ~= "seen" then
+            hintType = "trait"
+            hintValue = cleanClue
+            return hintType, hintValue
+        end
+    end
+
+    if hintType == "invalid" then
+        hintType = "trait"
+        hintValue = cleanedContent
+    end
+
+    return hintType, hintValue
+end
+
+-- Function to update the playersMatchingHints table
+local function updateMatchingHintPlayers()
+    playersMatchingHints = {}
+
+    if not espEnabled then return end
+
+    local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if not PlayerGui then return end
+
+    local TargetHintLabel = PlayerGui:FindFirstChild("RESETONDEATHStatusGui") and PlayerGui.RESETONDEATHStatusGui:FindFirstChild("TARGETHINT")
+
+    if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
+        return
+    end
+
+    local hintText = TargetHintLabel.Text
+
+    if string.len(string.gsub(hintText, "%s", "")) == 0 then
+        return
+    end
+
+    local hintPrefix = "Hints : "
+    local lowerHintText = string.lower(hintText)
+    local lowerHintPrefix = string.lower(hintPrefix)
+
+    if lowerHintText:sub(1, string.len(lowerHintPrefix)) ~= lowerHintPrefix then
+        return
+    end
+
+    local actualHintContent = hintText:sub(string.len(hintPrefix) + 1):match("^%s*(.-)%s*$")
+
+    local individualHintParts = {}
+    local currentPos = 1
+    while currentPos <= string.len(actualHintContent) do
+        local nextPlus = string.find(actualHintContent, " + ", currentPos, true)
+        if nextPlus then
+            local hintPart = string.sub(actualHintContent, currentPos, nextPlus - 1)
+            table.insert(individualHintParts, hintPart)
+            currentPos = nextPlus + string.len(" + ")
+        else
+            local hintPart = string.sub(actualHintContent, currentPos)
+            table.insert(individualHintParts, hintPart)
+            currentPos = string.len(actualHintContent) + 1
+        end
+    end
+
+    if #individualHintParts == 0 and string.len(actualHintContent) > 0 then
+        table.insert(individualHintParts, actualHintContent)
+    end
+
+    local targetConditions = {}
+
+    for i, hintPartContent in ipairs(individualHintParts) do
+        local targetNumberMatch = hintPartContent:match("^%[%s*(%d+)%s*%]")
+        local targetNumber = tonumber(targetNumberMatch) or 1
+        local cleanedHintPartContent = hintPartContent:gsub("^%[%s*%d+%s*%]%s*", ""):match("^%s*(.-)%s*$") or ""
+
+        local hintType, hintValue = parseSingleHint(cleanedHintPartContent)
+
+        if hintType ~= "invalid" and hintValue and string.len(hintValue) > 0 then
+            if not targetConditions[targetNumber] then
+                targetConditions[targetNumber] = {}
+            end
+            table.insert(targetConditions[targetNumber], { type = hintType, value = hintValue })
+        end
+    end
+
+    if next(targetConditions) == nil then
+        return
+    end
+
+    if not NPCSFolder then
+        return
+    end
+
+    for _, player in Players:GetPlayers() do
+        if player ~= lp then
+            local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
+
+            if playerNPCModel then
+                local configObject = playerNPCModel:FindFirstChild("Configuration")
+                local playerMatchesAnyTarget = false
+
+                for targetNumber, conditionsForTarget in pairs(targetConditions) do
+                    local playerMatchesAllConditionsForTarget = true
+
+                    for i, condition in ipairs(conditionsForTarget) do
+                        local conditionMet = false
+
+                        if condition.type == "task" then
+                            local assignedTaskObject = playerNPCModel:FindFirstChild("AssignedTask")
+                            if assignedTaskObject and assignedTaskObject:IsA("StringValue") and assignedTaskObject.Value == condition.value then
+                                conditionMet = true
+                            end
+                        elseif condition.type == "trait" then
+                            if configObject then
+                                for _, configChild in ipairs(configObject:GetChildren()) do
+                                    if configChild:IsA("StringValue") then
+                                        if configChild.Value == condition.value then
+                                            conditionMet = true
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if not conditionMet then
+                            playerMatchesAllConditionsForTarget = false
+                            break
+                        end
+                    end
+
+                    if playerMatchesAllConditionsForTarget then
+                        playerMatchesAnyTarget = true
+                        break
+                    end
+                end
+
+                if playerMatchesAnyTarget then
+                    playersMatchingHints[player] = true
+                end
             end
         end
     end
 end
 
-return tools -- Return table keyed by tool name
-
-end
-
--- Helper function to get standard role based on weapons (excluding special killer check)
-local function getStandardRoleFromWeapons(toolsByName)
-local role = nil
-local color = nil
-local label = nil
-
--- Check standard Killer weapons first (priority), *excluding* special ones here
-for weaponName, _ in pairs(killerWeapons) do
-    if not specialKillerWeapons[weaponName] and toolsByName[weaponName] then
-         role = "Killer"
-         color = killerColor
-         label = killerLabel
-         return role, color, label -- Standard Killer overrides Vigilante
-    end
-end
-
--- Check Vigilante weapons if no standard Killer weapon found
-for weaponName, _ in pairs(vigilanteWeapons) do
-    if toolsByName[weaponName] then
-        role = "Vigilante"
-        color = vigilanteColor
-        label = vigilanteLabel
-        return role, color, label -- Found a Vigilante weapon
-    end
-end
-
--- No standard role weapon found
-return nil, nil, nil
-
-end
-
--- Function to parse a single string of hint content
-local function parseSingleHint(hintContent)
-local hintType = "invalid"
-local hintValue = nil
-local cleanedContent = hintContent:match("^%s*(.-)%s*$") or "" -- Trim leading/trailing whitespace
-
-if string.len(cleanedContent) == 0 then
-    return hintType, hintValue
-end
-
--- Check for task hint format: "Is often seen " followed by the task
-local taskMatch = cleanedContent:match("^Is often seen%s*(.*)$")
-if taskMatch then
-    hintType = "task"
-    hintValue = taskMatch:match("^%s*(.-)%s*$") -- Trim extracted task
-    return hintType, hintValue
-end
-
--- Check for trait hint format: text within square brackets []
-local traitBracketMatch = cleanedContent:match("^%[.-%]$") -- Check if the whole part is just a bracketed trait
-if traitBracketMatch then
-    -- Extract content within brackets
-    local cleanClue = traitBracketMatch:gsub("[%[%]]", ""):match("^%s*(.-)%s*$") or ""
-    if string.len(cleanClue) > 0 and cleanClue:lower() ~= "assigned task" and cleanClue:lower() ~= "seen" then
-        hintType = "trait"
-        hintValue = cleanClue
-        return hintType, hintValue
-    end
-end
-
--- If neither format matched, treat the entire cleaned content as a single unbracketed trait.
-if hintType == "invalid" then
-    hintType = "trait" -- Assume it's an unbracketed trait
-    hintValue = cleanedContent
-end
-
-return hintType, hintValue
-
-end
-
--- Function to update the playersMatchingHints table based on current GUI hints
-local function updateMatchingHintPlayers()
-playersMatchingHints = {} -- Clear the previous results
-
-if not espEnabled then return end
-
-local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
-if not PlayerGui then return end
-
-local TargetHintLabel = PlayerGui:FindFirstChild("RESETONDEATHStatusGui") and PlayerGui.RESETONDEATHStatusGui:FindFirstChild("TARGETHINT")
-
-if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
-    return
-end
-
-local hintText = TargetHintLabel.Text
-
-if string.len(string.gsub(hintText, "%s", "")) == 0 then
-    return
-end
-
-local hintPrefix = "Hints : "
-local lowerHintText = string.lower(hintText)
-local lowerHintPrefix = string.lower(hintPrefix)
-
-if lowerHintText:sub(1, string.len(lowerHintPrefix)) ~= lowerHintPrefix then
-    return -- Exit if the hint text doesn't start with "Hints : "
-end
-
-local actualHintContent = hintText:sub(string.len(hintPrefix) + 1):match("^%s*(.-)%s*$")
-
-local individualHintParts = {}
-local currentPos = 1
-while currentPos <= string.len(actualHintContent) do
-    local nextPlus = string.find(actualHintContent, " + ", currentPos, true)
-    if nextPlus then
-        local hintPart = string.sub(actualHintContent, currentPos, nextPlus - 1)
-        table.insert(individualHintParts, hintPart)
-        currentPos = nextPlus + string.len(" + ")
-    else
-        local hintPart = string.sub(actualHintContent, currentPos)
-        table.insert(individualHintParts, hintPart)
-        currentPos = string.len(actualHintContent) + 1 -- Exit loop
-    end
-end
-
-if #individualHintParts == 0 and string.len(actualHintContent) > 0 then
-    table.insert(individualHintParts, actualHintContent)
-end
-
-local targetConditions = {} -- Table to hold conditions, grouped by target number
-
-for i, hintPartContent in ipairs(individualHintParts) do
-    local targetNumberMatch = hintPartContent:match("^%[%s*(%d+)%s*%]")
-    local targetNumber = tonumber(targetNumberMatch) or 1 -- Default to target 1 if no number found
-    local cleanedHintPartContent = hintPartContent:gsub("^%[%s*%d+%s*%]%s*", ""):match("^%s*(.-)%s*$") or "" -- Remove [number] prefix and trim
-
-    local hintType, hintValue = parseSingleHint(cleanedHintPartContent)
-
-    if hintType ~= "invalid" and hintValue and string.len(hintValue) > 0 then
-        if not targetConditions[targetNumber] then
-            targetConditions[targetNumber] = {}
-        end
-        table.insert(targetConditions[targetNumber], { type = hintType, value = hintValue })
-    end
-end
-
-if next(targetConditions) == nil then
-    return
-end
-
-
-if not NPCSFolder then
-    return
-end
-
-for _, player in Players:GetPlayers() do
-    if player ~= lp then
-        local playerNPCModel = NPCSFolder:FindFirstChild(player.Name)
-
-        if playerNPCModel then
-             local configObject = playerNPCModel:FindFirstChild("Configuration")
-
-             local playerMatchesAnyTarget = false
-
-             for targetNumber, conditionsForTarget in pairs(targetConditions) do
-                 local playerMatchesAllConditionsForTarget = true
-
-                 for i, condition in ipairs(conditionsForTarget) do
-                     local conditionMet = false
-
-                     if condition.type == "task" then
-                         local assignedTaskObject = playerNPCModel:FindFirstChild("AssignedTask")
-                         if assignedTaskObject and assignedTaskObject:IsA("StringValue") and assignedTaskObject.Value == condition.value then
-                             conditionMet = true
-                         end
-                     elseif condition.type == "trait" then
-                         if configObject then
-                              for _, configChild in ipairs(configObject:GetChildren()) do
-                                  if configChild:IsA("StringValue") then
-                                      if configChild.Value == condition.value then
-                                          conditionMet = true
-                                          break
-                                      end
-                                  end
-                              end
-                         end
-                     end
-
-                     if not conditionMet then
-                         playerMatchesAllConditionsForTarget = false
-                         break
-                     end
-                 end
-
-                 if playerMatchesAllConditionsForTarget then
-                     playerMatchesAnyTarget = true
-                     break
-                 end
-             end
-
-             if playerMatchesAnyTarget then
-                 playersMatchingHints[player] = true
-             end
-        end
-    end
-end
-
-end -- End of updateMatchingHintPlayers function
-
 -- Function to connect the hint text changed signal
 local function connectHintTextSignal()
-if not espEnabled then return end
-if hintTextConnection then
-hintTextConnection:Disconnect()
-hintTextConnection = nil
-end
-
-local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
- if not PlayerGui then return end
-
- local statusGui = PlayerGui:WaitForChild("RESETONDEATHStatusGui", 20)
- if not statusGui then
-     return
- end
-
- local TargetHintLabel = statusGui:WaitForChild("TARGETHINT", 10)
- if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
-     return
- end
-
- hintTextConnection = TargetHintLabel:GetPropertyChangedSignal("Text"):Connect(updateMatchingHintPlayers)
- updateMatchingHintPlayers() -- Run initial check immediately after connecting
-
-end
-
--- Detect and apply roles - Integrated updated logic and priorities
-local function detectRoles()
-if not espEnabled then return end
-
--- Initialize local flags for this run
-local everyoneHasGunConditionMet = false
-local noOneHasGunConditionMet = false
-
--- State for New Highest Priority Killer rule (Priority 1)
-local newHighestPriorityKillerDetected = false
-local theSingleKillerGunHolder = nil
-
--- State for Specific Juggernaut rule (Priority 2)
-local specificJuggernautDetected = false
-local theSpecificJuggernautHolder = nil -- Holder of the specific weapon
-
--- State for existing Special Killer rule (Priority 3 now)
-local specialKillerDetected = false
-local playersWithSpecialWeapons = {}
-
-local playersWithValidCharacters = {} -- Track players who are not local and have characters/HRP
-local playersWithoutAnyGun = {}         -- Track players without *any* role weapon
-local playersWithAnyGun = {}            -- Track players with *any* role weapon
-local playersWithVigilanteWeapons = {}  -- Track players with Vigilante weapons
-playersWithStandardKillerWeapons = {}   -- RESET for Standard Killer + Hint check
-
--- Counts for New Highest Priority Killer rule
-local vigilanteCount = 0
-local killerGunHoldersCount = 0
-local singleKillerGunHolderCandidate = nil
-
-
--- **Pass 1: Scan for conditions and identify player states**
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-         playersWithValidCharacters[player] = true
-
-         local toolsByName = collectPlayerTools(player)
-         local hasAnyRoleWeapon = false
-         local hasVigilanteWeapon = false
-         local hasKillerWeapon = false
-
-         -- Check for conditions and weapons on this player
-         for name, tool in pairs(toolsByName) do
-             -- Check for Special Killers (for Priority 3 and NEW Priority 2)
-             if specialKillerWeapons[name] then
-                 specialKillerDetected = true
-                 playersWithSpecialWeapons[player] = true
-
-                 -- NEW CHECK: If this is one of the specific Juggernaut weapons
-                 if specificJuggernautWeapons[name] then
-                     specificJuggernautDetected = true
-                     theSpecificJuggernautHolder = player
-                 end
-             end
-             -- Check if it's *any* role weapon
-             if allRoleWeapons[name] then
-                  hasAnyRoleWeapon = true
-             end
-             -- Check for Vigilante weapon
-             if vigilanteWeapons[name] then
-                 hasVigilanteWeapon = true
-                 playersWithVigilanteWeapons[player] = true
-             end
-             -- Check for ANY Killer weapon
-             if killerWeapons[name] then
-                 hasKillerWeapon = true
-                 -- Check for STANDARD Killer Weapon (not in the special list)
-                 if not specialKillerWeapons[name] then
-                     playersWithStandardKillerWeapons[player] = true
-                 end
-             end
-         end
-
-         if hasVigilanteWeapon then
-              vigilanteCount = vigilanteCount + 1
-              if firstVigilanteTracker[player] == nil then
-                  firstVigilanteTracker[player] = true
-              end
-         end
-
-          if hasKillerWeapon then
-              killerGunHoldersCount = killerGunHoldersCount + 1
-              singleKillerGunHolderCandidate = player
-         end
-
-
-         if not hasAnyRoleWeapon then
-             playersWithoutAnyGun[player] = true
-         else
-             playersWithAnyGun[player] = true
-         end
-
-    else
-        clearOldStuff(player.Character)
-    end
-end
-
--- **Step 2: Determine if the New Highest Priority Killer rule applies (Priority 1)**
-if vigilanteCount == 1 and killerGunHoldersCount == 1 and singleKillerGunHolderCandidate then
-     newHighestPriorityKillerDetected = true
-     theSingleKillerGunHolder = singleKillerGunHolderCandidate
-     -- This high-priority rule overrides all lower rules
-     specialKillerDetected = false
-     specificJuggernautDetected = false
-     rolesLockedByDistance = false
-     lockedDistanceRoles = {}
-
-     if theSingleKillerGunHolder == lp then
-         updateMatchingHintPlayers()
-     end
-end
-
-
--- **Step 3: Determine the state of "Everyone has a gun" and "No one has a gun" conditions**
--- These conditions are calculated *regardless* of P1, P2, P3, but P4 logic later relies on P1/P2/P3 being inactive.
-local otherPlayersWithCharCount = 0
-for player, _ in pairs(playersWithValidCharacters) do
-    if player ~= lp then otherPlayersWithCharCount = otherPlayersWithCharCount + 1 end
-end
-
--- 3a: Check "Everyone has a gun"
-local allValidTargetsHaveGun = true
-for player, _ in pairs(playersWithValidCharacters) do
-    if playersWithoutAnyGun[player] then
-        allValidTargetsHaveGun = false
-        break
-    end
-end
-if allValidTargetsHaveGun and otherPlayersWithCharCount > 0 then
-    everyoneHasGunConditionMet = true
-end
-
--- 3b: Check "No one has a gun"
-local anyValidTargetHasGun = false
-for player, _ in pairs(playersWithValidCharacters) do
-     if playersWithAnyGun[player] then
-         anyValidTargetHasGun = true
-         break
-     end
-end
-if not anyValidTargetHasGun and otherPlayersWithCharCount > 0 then
-     noOneHasGunConditionMet = true
-end
-
-
--- **Step 4: Manage the distance locking state (rolesLockedByDistance) (Priority 4 logic)**
-
-local higherPriorityActive = newHighestPriorityKillerDetected or specificJuggernautDetected or specialKillerDetected
-
-if not higherPriorityActive then -- Only manage the lock if P1, P2, P3 are inactive (Standard Game Mode)
-
-     -- ACTIVATE Lock (Condition: Everyone has a gun AND Lock is currently OFF)
-     if everyoneHasGunConditionMet and not rolesLockedByDistance then
-          rolesLockedByDistance = true -- Activate the lock
-          lockedDistanceRoles = {} -- Clear any old locked roles
-          -- print("Blood Debt Role Detector: Distance Lock ACTIVATED by 'Everyone has a gun'.") -- DEBUG
-
-          local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-
-          if localHRP then
-              for player, _ in pairs(playersWithValidCharacters) do
-                  local playerHRP = player.Character:FindFirstChild("HumanoidRootPart")
-                  if playerHRP then
-                      local distance = (localHRP.Position - playerHRP.Position).Magnitude
-                      if distance >= distanceThreshold then
-                           lockedDistanceRoles[player] = "Killer"
-                      else
-                           lockedDistanceRoles[player] = "Innocent"
-                      end
-                  end
-              end
-          else
-               rolesLockedByDistance = false -- Force lock off if cannot calculate distance
-               lockedDistanceRoles = {}
-               warn("Blood Debt Role Detector: Distance Lock failed to activate: Local HRP missing.")
-          end
-
-     -- DEACTIVATE Lock (Condition: No one has a gun AND Lock is currently ON)
-     elseif noOneHasGunConditionMet and rolesLockedByDistance then
-          rolesLockedByDistance = false -- Deactivate the lock
-          lockedDistanceRoles = {} -- Clear stored roles
-          -- print("Blood Debt Role Detector: Distance Lock DEACTIVATED by 'No one has a gun'.")
-     end
-
-else
-     -- print("DEBUG: Higher Priority Active (P1/P2/P3). Distance lock management skipped/maintained override.")
-     -- Ensure the lock is off if a new higher priority rule is detected, even if it wasn't cleared by P1 logic
-     if rolesLockedByDistance then
-         rolesLockedByDistance = false
-         lockedDistanceRoles = {}
-         -- print("DEBUG: Higher Priority detected: Cleared residual Distance Lock.")
-     end
-end
-
-
--- **Step 5: Trigger Hint Matching Update**
-updateMatchingHintPlayers()
-
-
--- **Pass 2: Apply Tags based on determined state (New #1 > Specific Juggernaut > Special Killer > Distance Locked > Vigilante+Hint > Killer+Hint > Hint Match > Standard)**
-for _, player in ipairs(Players:GetPlayers()) do
-    if playersWithValidCharacters[player] then
-
-         if newHighestPriorityKillerDetected and player == theSingleKillerGunHolder then
-             -- Priority 1: New #1 Killer Rule
-             tagPlayer(player, killerColor, killerLabel)
-
-         elseif specificJuggernautDetected then
-             -- Priority 2: Specific Juggernaut Rule (AK47, RVK, Pretty Pink RVK)
-             if player == theSpecificJuggernautHolder then
-                 tagPlayer(player, killerColor, killerLabel)
-             else
-                 -- All other players: Check if they have *any* role weapon
-                 local toolsByName = collectPlayerTools(player)
-                 local hasAnyRoleWeapon = false
-                 for name, _ in pairs(toolsByName) do
-                     if allRoleWeapons[name] then
-                         hasAnyRoleWeapon = true
-                         break
-                     end
-                 end -- **FIXED: Replaced extraneous '}' with 'end' for the 'for' loop**
-
-                 if hasAnyRoleWeapon then
-                     -- They have a registered gun, tag them as VIGILANTE
-                     tagPlayer(player, vigilanteColor, vigilanteLabel)
-                 else
-                     -- They have no registered gun, tag them as INNOCENT
-                     tagPlayer(player, innocentColor, innocentLabel)
-                 end
-             end
-
-         elseif specialKillerDetected then
-             -- Priority 3: Special Killer rule (General Special Guns)
-             if playersWithSpecialWeapons[player] then
-                 tagPlayer(player, killerColor, killerLabel)
-             else
-                 tagPlayer(player, innocentColor, innocentLabel)
-             end
-
-         elseif rolesLockedByDistance then
-             -- Priority 4: Roles locked by "Everyone has a gun" rule - Use LOCKED distance roles
-             local lockedRole = lockedDistanceRoles[player]
-             if lockedRole then
-                  if lockedRole == "Killer" then
-                       tagPlayer(player, killerColor, killerLabel)
-                  elseif lockedRole == "Innocent" then
-                       tagPlayer(player, innocentColor, innocentLabel)
-                  end
-             else
-                 clearOldStuff(player.Character)
-             end
-
-         elseif playersMatchingHints[player] and playersWithVigilanteWeapons[player] then
-             -- Priority 5: Vigilante + Hint Match (Purple)
-             tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
-
-         elseif playersMatchingHints[player] and playersWithStandardKillerWeapons[player] then
-             -- Priority 6: NEW Killer + Hint Match (Orange)
-             tagPlayer(player, killerHintColor, killerHintLabel)
-
-         elseif playersMatchingHints[player] and not playersWithStandardKillerWeapons[player] and not playersWithVigilanteWeapons[player] then
-             -- Priority 7: Hint Matching Yellow Color (Only applies if no weapon match)
-             tagPlayer(player, hintMatchColor, hintMatchLabel)
-
-         else
-             -- Priority 8: Standard detection
-             local toolsByName = collectPlayerTools(player)
-             local standardRole, standardColor, standardLabel = getStandardRoleFromWeapons(toolsByName)
-             if standardRole then
-                 tagPlayer(player, standardColor, standardLabel)
-             else
-                 tagPlayer(player, innocentColor, innocentLabel)
-             end
-         end
-
-    else
-        clearOldStuff(player.Character)
-    end
-end
-
-end -- End of detectRoles function
-
--- Function to disable ESP - Shared logic (Includes clearing lock/hint state)
-local function disableEsp()
-if espEnabled then -- Only disable if it's currently enabled
-espEnabled = false
-stopEspLoop = true -- Signal to stop the loop
-print("Blood Debt Role Detector: ESP Disabled")
-
--- Clear state variables
-    rolesLockedByDistance = false
-    lockedDistanceRoles = {}
-    playersMatchingHints = {}
-    playersWithStandardKillerWeapons = {}
-    firstVigilanteTracker = {} -- **FIXED: Added cleanup for the state table**
-
-    -- Disconnect the main PlayerAdded connection
-    if espPlayerAddedConnection then
-        espPlayerAddedConnection:Disconnect()
-        espPlayerAddedConnection = nil
-    end
-
-    -- Disconnect hint text signal
+    if not espEnabled then return end
     if hintTextConnection then
         hintTextConnection:Disconnect()
         hintTextConnection = nil
     end
 
-    -- Disconnect all stored CharacterAdded connections
-    for player, connection in pairs(espCharacterAddedConnections) do
-         if connection and typeof(connection) == "RBXScriptConnection" then -- Safety check connection type
-            connection:Disconnect()
-        end
-        espCharacterAddedConnections[player] = nil
+    local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if not PlayerGui then return end
+
+    local statusGui = PlayerGui:WaitForChild("RESETONDEATHStatusGui", 20)
+    if not statusGui then
+        return
     end
-    espCharacterAddedConnections = {} -- Clear the table itself
 
+    local TargetHintLabel = statusGui:WaitForChild("TARGETHINT", 10)
+    if not TargetHintLabel or not TargetHintLabel:IsA("TextLabel") then
+        return
+    end
 
-    -- Clear ESP visuals for all players currently in the game
+    hintTextConnection = TargetHintLabel:GetPropertyChangedSignal("Text"):Connect(updateMatchingHintPlayers)
+    updateMatchingHintPlayers()
+end
+
+-- Detect and apply roles
+local function detectRoles()
+    if not espEnabled then return end
+
+    local everyoneHasGunConditionMet = false
+    local noOneHasGunConditionMet = false
+    local newHighestPriorityKillerDetected = false
+    local theSingleKillerGunHolder = nil
+    local specificJuggernautDetected = false
+    local theSpecificJuggernautHolder = nil
+    local specialKillerDetected = false
+    local playersWithSpecialWeapons = {}
+    local playersWithValidCharacters = {}
+    local playersWithoutAnyGun = {}
+    local playersWithAnyGun = {}
+    local playersWithVigilanteWeapons = {}
+    playersWithStandardKillerWeapons = {}
+    local vigilanteCount = 0
+    local killerGunHoldersCount = 0
+    local singleKillerGunHolderCandidate = nil
+
     for _, player in ipairs(Players:GetPlayers()) do
-         if player.Character then
+        if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            playersWithValidCharacters[player] = true
+
+            local toolsByName = collectPlayerTools(player)
+            local hasAnyRoleWeapon = false
+            local hasVigilanteWeapon = false
+            local hasKillerWeapon = false
+
+            for name, tool in pairs(toolsByName) do
+                if specialKillerWeapons[name] then
+                    specialKillerDetected = true
+                    playersWithSpecialWeapons[player] = true
+
+                    if specificJuggernautWeapons[name] then
+                        specificJuggernautDetected = true
+                        theSpecificJuggernautHolder = player
+                    end
+                end
+                if allRoleWeapons[name] then
+                    hasAnyRoleWeapon = true
+                end
+                if vigilanteWeapons[name] then
+                    hasVigilanteWeapon = true
+                    playersWithVigilanteWeapons[player] = true
+                end
+                if killerWeapons[name] then
+                    hasKillerWeapon = true
+                    if not specialKillerWeapons[name] then
+                        playersWithStandardKillerWeapons[player] = true
+                    end
+                end
+            end
+
+            if hasVigilanteWeapon then
+                vigilanteCount = vigilanteCount + 1
+                if firstVigilanteTracker[player] == nil then
+                    firstVigilanteTracker[player] = true
+                end
+            end
+
+            if hasKillerWeapon then
+                killerGunHoldersCount = killerGunHoldersCount + 1
+                singleKillerGunHolderCandidate = player
+            end
+
+            if not hasAnyRoleWeapon then
+                playersWithoutAnyGun[player] = true
+            else
+                playersWithAnyGun[player] = true
+            end
+        else
             clearOldStuff(player.Character)
         end
     end
-     Rayfield:Notify({
-        Title = "ESP Disabled",
-        Content = "Role detection has been turned off.",
-        Duration = 3,
-        Image = 4483362458 -- Replace with a suitable asset ID
-    })
-end
 
-end
+    if vigilanteCount == 1 and killerGunHoldersCount == 1 and singleKillerGunHolderCandidate then
+        newHighestPriorityKillerDetected = true
+        theSingleKillerGunHolder = singleKillerGunHolderCandidate
+        specialKillerDetected = false
+        specificJuggernautDetected = false
+        rolesLockedByDistance = false
+        lockedDistanceRoles = {}
 
--- Function to teleport to dropped gun - Includes all relevant weapons
-local function tpToDroppedGun()
--- Ensure BloodFolder is available (waited for at the top)
-if not BloodFolder then
-warn("Blood Debt Role Detector: BloodFolder not available for teleport.")
-Rayfield:Notify({
-Title = "Error",
-Content = "BloodFolder not found in Workspace.",
-Duration = 5,
-Image = 4483362458 -- Replace with a suitable asset ID
-})
-return
-end
+        if theSingleKillerGunHolder == lp then
+            updateMatchingHintPlayers()
+        end
+    end
 
-local foundGun = false
-for _, item in ipairs(BloodFolder:GetChildren()) do
-    -- Check if the dropped item is a Tool and is a recognized role weapon
-    if item:IsA("Tool") and (killerWeapons[item.Name] or vigilanteWeapons[item.Name] or specialKillerWeapons[item.Name]) then
-        
-        -- FIX: Find the physical Handle part of the Tool to get its position
-        local handle = item:FindFirstChild("Handle")
-        
-        if handle and handle:IsA("BasePart") then
-            local targetPosition = handle.Position + Vector3.new(0, 5, 0) -- Teleport slightly above the item
-            
-            if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
-                 lp.Character:SetPrimaryPartCFrame(CFrame.new(targetPosition))
-                 foundGun = true
-                 break -- Teleported to the first found gun
+    local otherPlayersWithCharCount = 0
+    for player, _ in pairs(playersWithValidCharacters) do
+        if player ~= lp then otherPlayersWithCharCount = otherPlayersWithCharCount + 1 end
+    end
+
+    local allValidTargetsHaveGun = true
+    for player, _ in pairs(playersWithValidCharacters) do
+        if playersWithoutAnyGun[player] then
+            allValidTargetsHaveGun = false
+            break
+        end
+    end
+    if allValidTargetsHaveGun and otherPlayersWithCharCount > 0 then
+        everyoneHasGunConditionMet = true
+    end
+
+    local anyValidTargetHasGun = false
+    for player, _ in pairs(playersWithValidCharacters) do
+        if playersWithAnyGun[player] then
+            anyValidTargetHasGun = true
+            break
+        end
+    end
+    if not anyValidTargetHasGun and otherPlayersWithCharCount > 0 then
+        noOneHasGunConditionMet = true
+    end
+
+    local higherPriorityActive = newHighestPriorityKillerDetected or specificJuggernautDetected or specialKillerDetected
+
+    if not higherPriorityActive then
+        if everyoneHasGunConditionMet and not rolesLockedByDistance then
+            rolesLockedByDistance = true
+            lockedDistanceRoles = {}
+
+            local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+
+            if localHRP then
+                for player, _ in pairs(playersWithValidCharacters) do
+                    local playerHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                    if playerHRP then
+                        local distance = (localHRP.Position - playerHRP.Position).Magnitude
+                        if distance >= distanceThreshold then
+                            lockedDistanceRoles[player] = "Killer"
+                        else
+                            lockedDistanceRoles[player] = "Innocent"
+                        end
+                    end
+                end
             else
-                 warn("Blood Debt Role Detector: Local player character or HRP not found for teleport.")
-                 Rayfield:Notify({
-                    Title = "Error",
-                    Content = "Cannot teleport: Your character is not ready.",
-                    Duration = 5,
-                    Image = 4483362458 -- Replace with a suitable asset ID
-                })
-                return -- Exit if character not ready
+                rolesLockedByDistance = false
+                lockedDistanceRoles = {}
+                warn("Blood Debt Role Detector: Distance Lock failed to activate: Local HRP missing.")
+            end
+        elseif noOneHasGunConditionMet and rolesLockedByDistance then
+            rolesLockedByDistance = false
+            lockedDistanceRoles = {}
+        end
+    else
+        if rolesLockedByDistance then
+            rolesLockedByDistance = false
+            lockedDistanceRoles = {}
+        end
+    end
+
+    updateMatchingHintPlayers()
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if playersWithValidCharacters[player] then
+            if newHighestPriorityKillerDetected and player == theSingleKillerGunHolder then
+                tagPlayer(player, killerColor, killerLabel)
+            elseif specificJuggernautDetected then
+                if player == theSpecificJuggernautHolder then
+                    tagPlayer(player, killerColor, killerLabel)
+                else
+                    local toolsByName = collectPlayerTools(player)
+                    local hasAnyRoleWeapon = false
+                    for name, _ in pairs(toolsByName) do
+                        if allRoleWeapons[name] then
+                            hasAnyRoleWeapon = true
+                            break
+                        end
+                    end
+
+                    if hasAnyRoleWeapon then
+                        tagPlayer(player, vigilanteColor, vigilanteLabel)
+                    else
+                        tagPlayer(player, innocentColor, innocentLabel)
+                    end
+                end
+            elseif specialKillerDetected then
+                if playersWithSpecialWeapons[player] then
+                    tagPlayer(player, killerColor, killerLabel)
+                else
+                    tagPlayer(player, innocentColor, innocentLabel)
+                end
+            elseif rolesLockedByDistance then
+                local lockedRole = lockedDistanceRoles[player]
+                if lockedRole then
+                    if lockedRole == "Killer" then
+                        tagPlayer(player, killerColor, killerLabel)
+                    elseif lockedRole == "Innocent" then
+                        tagPlayer(player, innocentColor, innocentLabel)
+                    end
+                else
+                    clearOldStuff(player.Character)
+                end
+            elseif playersMatchingHints[player] and playersWithVigilanteWeapons[player] then
+                tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
+            elseif playersMatchingHints[player] and playersWithStandardKillerWeapons[player] then
+                tagPlayer(player, killerHintColor, killerHintLabel)
+            elseif playersMatchingHints[player] and not playersWithStandardKillerWeapons[player] and not playersWithVigilanteWeapons[player] then
+                tagPlayer(player, hintMatchColor, hintMatchLabel)
+            else
+                local toolsByName = collectPlayerTools(player)
+                local standardRole, standardColor, standardLabel = getStandardRoleFromWeapons(toolsByName)
+                if standardRole then
+                    tagPlayer(player, standardColor, standardLabel)
+                else
+                    tagPlayer(player, innocentColor, innocentLabel)
+                end
             end
         else
-            -- Warn if a tool is found but no handle is present (or it's not a part)
-            warn("Tool '"..item.Name.."' found in BloodFolder but missing a valid Handle part for teleportation.")
+            clearOldStuff(player.Character)
         end
-        
     end
 end
 
-if not foundGun then
-    Rayfield:Notify({
-        Title = "No Gun Found",
-        Content = "There are no valid guns in the BloodFolder.",
-        Duration = 5,
-        Image = 4483362458 -- Replace with a suitable asset ID
-    })
+-- Function to disable ESP
+local function disableEsp()
+    if espEnabled then
+        espEnabled = false
+        stopEspLoop = true
+        print("Blood Debt Role Detector: ESP Disabled")
+
+        rolesLockedByDistance = false
+        lockedDistanceRoles = {}
+        playersMatchingHints = {}
+        playersWithStandardKillerWeapons = {}
+        firstVigilanteTracker = {}
+
+        if espPlayerAddedConnection then
+            espPlayerAddedConnection:Disconnect()
+            espPlayerAddedConnection = nil
+        end
+
+        if hintTextConnection then
+            hintTextConnection:Disconnect()
+            hintTextConnection = nil
+        end
+
+        for player, connection in pairs(espCharacterAddedConnections) do
+            if connection and typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            end
+            espCharacterAddedConnections[player] = nil
+        end
+        espCharacterAddedConnections = {}
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character then
+                clearOldStuff(player.Character)
+            end
+        end
+
+        Rayfield:Notify({
+            Title = "ESP Disabled",
+            Content = "Role detection has been turned off.",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
 end
 
+-- Function to teleport to dropped gun
+local function tpToDroppedGun()
+    if not BloodFolder then
+        warn("Blood Debt Role Detector: BloodFolder not available for teleport.")
+        Rayfield:Notify({
+            Title = "Error",
+            Content = "BloodFolder not found in Workspace.",
+            Duration = 5,
+            Image = 4483362458
+        })
+        return
+    end
+
+    local foundGun = false
+    for _, item in ipairs(BloodFolder:GetChildren()) do
+        if item:IsA("Tool") and (killerWeapons[item.Name] or vigilanteWeapons[item.Name] or specialKillerWeapons[item.Name]) then
+            local handle = item:FindFirstChild("Handle")
+
+            if handle and handle:IsA("BasePart") then
+                local targetPosition = handle.Position + Vector3.new(0, 5, 0)
+
+                if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                    lp.Character:SetPrimaryPartCFrame(CFrame.new(targetPosition))
+                    foundGun = true
+                    break
+                else
+                    warn("Blood Debt Role Detector: Local player character or HRP not found for teleport.")
+                    Rayfield:Notify({
+                        Title = "Error",
+                        Content = "Cannot teleport: Your character is not ready.",
+                        Duration = 5,
+                        Image = 4483362458
+                    })
+                    return
+                end
+            else
+                warn("Tool '"..item.Name.."' found in BloodFolder but missing a valid Handle part for teleportation.")
+            end
+        end
+    end
+
+    if not foundGun then
+        Rayfield:Notify({
+            Title = "No Gun Found",
+            Content = "There are no valid guns in the BloodFolder.",
+            Duration = 5,
+            Image = 4483362458
+        })
+    end
 end
 
--- Add a button for teleporting to the dropped gun
-local ButtonTPGunCreateSuccess, ButtonTPGun = pcall(function()
-return Tab:CreateButton({
-Name = "Teleport to Dropped Gun",
-Callback = function()
-tpToDroppedGun()
-end
+-- NEW: Dropdown for Nametag Mode Selection
+local DropdownNametagMode = Tab:CreateDropdown({
+    Name = "Nametag Display Mode",
+    Options = {"Role", "Username", "Character Name"},
+    CurrentOption = {"Role"},
+    MultipleOptions = false,
+    Flag = "NametagModeDropdown",
+    Callback = function(Option)
+        nametagMode = Option[1] or "Role"
+        print("Blood Debt Role Detector: Nametag mode changed to:", nametagMode)
+        
+        -- Re-apply tags to update nametags immediately
+        if espEnabled then
+            detectRoles()
+        end
+        
+        Rayfield:Notify({
+            Title = "Nametag Mode Changed",
+            Content = "Now displaying: " .. nametagMode,
+            Duration = 3,
+            Image = 4483362458
+        })
+    end,
 })
+
+-- Teleport to Dropped Gun button
+local ButtonTPGunCreateSuccess, ButtonTPGun = pcall(function()
+    return Tab:CreateButton({
+        Name = "Teleport to Dropped Gun",
+        Callback = function()
+            tpToDroppedGun()
+        end
+    })
 end)
 
 if not ButtonTPGunCreateSuccess or not ButtonTPGun then
-warn("Blood Debt Role Detector: Failed to create Teleport to Dropped Gun button. Success:", ButtonTPGunCreateSuccess)
+    warn("Blood Debt Role Detector: Failed to create Teleport to Dropped Gun button.")
 else
-print("Blood Debt Role Detector: Teleport to Dropped Gun button created successfully.")
+    print("Blood Debt Role Detector: Teleport to Dropped Gun button created successfully.")
 end
 
--- Create Enable ESP button - Only enables if not already enabled
+-- Enable ESP button
 local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
-return Tab:CreateButton({
-Name = "Enable ESP",
-Callback = function()
-if not espEnabled then -- Only enable if it's currently disabled
-espEnabled = true
-stopEspLoop = false -- Ensure loop will run
-print("Blood Debt Role Detector: ESP Enabled")
+    return Tab:CreateButton({
+        Name = "Enable ESP",
+        Callback = function()
+            if not espEnabled then
+                espEnabled = true
+                stopEspLoop = false
+                print("Blood Debt Role Detector: ESP Enabled")
 
--- Start the detection loop in a new thread/coroutine
-            task.spawn(function()
-                while espEnabled and not stopEspLoop do -- Loop condition
-                    task.wait(0.5) -- Adjust wait time as needed
-                    detectRoles() -- detectRoles has its own espEnabled check
-                end
-                 print("Blood Debt Role Detector: ESP Detection loop stopped.")
-            end)
-
-            -- Connect PlayerAdded/CharacterAdded events for new players joining
-            espPlayerAddedConnection = game.Players.PlayerAdded:Connect(function(player)
-                 local charAddedConn = player.CharacterAdded:Connect(function(character)
-                     task.wait(0.1) -- Give a small delay for character/GUI to potentially load
-                     connectHintTextSignal() -- Attempt to reconnect the hint signal for the new player's GUI
-                     detectRoles() -- Run detection for the new player
-                 end)
-                 espCharacterAddedConnections[player] = charAddedConn -- Store connection
-
-                 -- Also run detectRoles if character already exists (e.g., joining mid-game)
-                 if player.Character then
-                      task.wait(0.1)
-                      detectRoles()
-                 end
-            end)
-
-            -- Connect PlayerRemoving for cleanup
-             game.Players.PlayerRemoving:Connect(function(player)
-                if espCharacterAddedConnections[player] then
-                    if typeof(espCharacterAddedConnections[player]) == "RBXScriptConnection" then -- Safety check
-                        espCharacterAddedConnections[player]:Disconnect()
+                task.spawn(function()
+                    while espEnabled and not stopEspLoop do
+                        task.wait(0.5)
+                        detectRoles()
                     end
-                    espCharacterAddedConnections[player] = nil
-                end
-                -- Clear visuals for the player who is leaving
-                clearOldStuff(player.Character)
-            end)
+                    print("Blood Debt Role Detector: ESP Detection loop stopped.")
+                end)
 
-            -- Connect the hint text signal for real-time hint updates (Initial connection attempt)
-            -- This is crucial for hint matching to work.
-            connectHintTextSignal()
+                espPlayerAddedConnection = game.Players.PlayerAdded:Connect(function(player)
+                    local charAddedConn = player.CharacterAdded:Connect(function(character)
+                        task.wait(0.1)
+                        connectHintTextSignal()
+                        detectRoles()
+                    end)
+                    espCharacterAddedConnections[player] = charAddedConn
 
-            -- Initial detection right after enabling for players already in game
-            detectRoles()
+                    if player.Character then
+                        task.wait(0.1)
+                        detectRoles()
+                    end
+                end)
 
-            Rayfield:Notify({
-                Title = "ESP Enabled",
-                Content = "Role detection has been turned on.",
-                Duration = 3,
-                Image = 4483362458 -- Replace with a suitable asset ID
-            })
+                game.Players.PlayerRemoving:Connect(function(player)
+                    if espCharacterAddedConnections[player] then
+                        if typeof(espCharacterAddedConnections[player]) == "RBXScriptConnection" then
+                            espCharacterAddedConnections[player]:Disconnect()
+                        end
+                        espCharacterAddedConnections[player] = nil
+                    end
+                    clearOldStuff(player.Character)
+                end)
 
-        else
-            print("Blood Debt Role Detector: ESP is already enabled.")
-             Rayfield:Notify({
-                Title = "ESP Already On",
-                Content = "Role detection is already running.",
-                Duration = 3,
-                Image = 4483362458 -- Replace with a suitable asset ID
-            })
+                connectHintTextSignal()
+                detectRoles()
+
+                Rayfield:Notify({
+                    Title = "ESP Enabled",
+                    Content = "Role detection has been turned on.",
+                    Duration = 3,
+                    Image = 4483362458
+                })
+            else
+                print("Blood Debt Role Detector: ESP is already enabled.")
+                Rayfield:Notify({
+                    Title = "ESP Already On",
+                    Content = "Role detection is already running.",
+                    Duration = 3,
+                    Image = 4483362458
+                })
+            end
         end
-    end
-})
-
+    })
 end)
 
 if not ButtonEnableESPCreateSuccess or not ButtonEnableESP then
-warn("Blood Debt Role Detector: Failed to create Enable ESP button. Success:", ButtonEnableESPCreateSuccess)
+    warn("Blood Debt Role Detector: Failed to create Enable ESP button.")
 else
-print("Blood Debt Role Detector: Enable ESP button created successfully.")
+    print("Blood Debt Role Detector: Enable ESP button created successfully.")
 end
 
--- Create Disable ESP button - Calls the shared disable function
+-- Disable ESP button
 local ButtonDisableESPCreateSuccess, ButtonDisableESP = pcall(function()
-return Tab:CreateButton({
-Name = "Disable ESP",
-Callback = function()
-disableEsp() -- Call the shared disable function
-end
-})
+    return Tab:CreateButton({
+        Name = "Disable ESP",
+        Callback = function()
+            disableEsp()
+        end
+    })
 end)
 
 if not ButtonDisableESPCreateSuccess or not ButtonDisableESP then
-warn("Blood Debt Role Detector: Failed to create Disable ESP button. Success:", ButtonDisableESPCreateSuccess)
+    warn("Blood Debt Role Detector: Failed to create Disable ESP button.")
 else
-print("Blood Debt Role Detector: Disable ESP button created successfully.")
+    print("Blood Debt Role Detector: Disable ESP button created successfully.")
 end
 
--- Notify the user about ESP - Adjusted to mention two buttons
--- This notification might appear before the buttons are fully visible, depending on Rayfield's rendering.
--- It's more of a confirmation that the script ran through the UI creation steps.
 Rayfield:Notify({
-Title = "ESP Script Initialized",
-Content = "Attempted to create UI elements. Check output for details.",
-Duration = 5,
-Image = 4483362458 -- Replace with a suitable asset ID
+    Title = "ESP Script Initialized",
+    Content = "Customizable nametags enabled. Select display mode from dropdown.",
+    Duration = 5,
+    Image = 4483362458
 })
-
--- End of Script
