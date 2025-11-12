@@ -1017,7 +1017,7 @@ local AimbotTab = Window:CreateTab("Aimbot")
 -- =========================================================================================
 -- This table holds the CURRENT state of the config. The UI will update this,
 -- and the FOV circle will read from it. It's also used to format the
--- "message in a bottle" strings sent to the actor thread.
+-- strings sent to the actor thread.
 local LocalAimbotConfig = {
     HitChance = 100,
     wallcheck = false,
