@@ -46,6 +46,7 @@ local killerWeapons = {
     ["J9-Mereta"] = true,
     ["RY's GG-17"] = true,
     ["RR-LCP"] = true,
+    ["Door'bler"] = true,
     ["JS1-Competitor"] = true,
     ["AT's KAR15"] = true,
     ["VK's ANKM"] = true,
