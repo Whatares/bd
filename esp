@@ -114,7 +114,6 @@ local killerWeapons = {
     ["RR-Mark2"] = true,
     ["Dual LCPs"] = true,
     ["RR-LightCompactPistolS10"] = true,
-    ["Cloth"] = true,
     ["Wild Mandols-5"] = true,
     ["AK47 Case Hardened 1000000"] = true,
     ["Kensington20"] = true,
