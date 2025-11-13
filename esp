@@ -143,6 +143,7 @@ local killerWeapons = {
     ["1895-Rosey"] = true,
     ["K1911 'Memorial'"] = true,
     ["APZ"] = true,
+    ["Door'bler"] = true,
 }
 
 local vigilanteWeapons = {
