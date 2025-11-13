@@ -6,6 +6,11 @@ UPDATED: Added dropdown menu to select nametag display mode:
 - Role (Default): Shows the detected role
 - Username: Shows the player's Roblox username
 - Character Name: Shows the in-game character name from NPCSFolder
+UPDATED: Added Role Target Function for Bullet Redirection (Aimbot).
+- Role Detection is now always active.
+- ESP is now a visual layer that reads from the Role Detection data.
+- Aimbot targeting can be filtered to "All", "Killer", or "Vigilante".
+FIXED: Corrected role detection logic to improve Vigilante identification and make Distance Lock more reliable.
 ]]
 -- Load Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -108,7 +113,6 @@ local killerWeapons = {
     ["RR-Mark2"] = true,
     ["Dual LCPs"] = true,
     ["RR-LightCompactPistolS10"] = true,
-    ["Cloth"] = true,
     ["Wild Mandols-5"] = true,
     ["AK47 Case Hardened 1000000"] = true,
     ["Kensington20"] = true,
@@ -223,6 +227,10 @@ local playersMatchingHints = {}
 local hintTextConnection = nil
 local firstVigilanteTracker = {}
 local playersWithStandardKillerWeapons = {}
+-- NEW: Central data store for player roles. This is always updated.
+local playerRoles = {}
+-- NEW: Aimbot targeting mode
+local bulletRedirectionMode = "All"
 -- NEW: Function to get character name from NPCSFolder
 local function getCharacterName(player)
     if NPCSFolder then
@@ -425,8 +433,6 @@ end
 local function updateMatchingHintPlayers()
     playersMatchingHints = {}
 
-    if not espEnabled then return end
-
     local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
     if not PlayerGui then return end
 
@@ -549,7 +555,6 @@ local function updateMatchingHintPlayers()
 end
 -- Function to connect the hint text changed signal
 local function connectHintTextSignal()
-    if not espEnabled then return end
     if hintTextConnection then
         hintTextConnection:Disconnect()
         hintTextConnection = nil
@@ -571,10 +576,8 @@ local function connectHintTextSignal()
     hintTextConnection = TargetHintLabel:GetPropertyChangedSignal("Text"):Connect(updateMatchingHintPlayers)
     updateMatchingHintPlayers()
 end
--- Detect and apply roles
+-- Detect and apply roles. This function now only updates the playerRoles table.
 local function detectRoles()
-    if not espEnabled then return end
-
     local everyoneHasGunConditionMet = false
     local noOneHasGunConditionMet = false
     local newHighestPriorityKillerDetected = false
@@ -591,6 +594,9 @@ local function detectRoles()
     local vigilanteCount = 0
     local killerGunHoldersCount = 0
     local singleKillerGunHolderCandidate = nil
+
+    -- Clear previous roles before detection
+    playerRoles = {}
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= lp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -643,8 +649,6 @@ local function detectRoles()
             else
                 playersWithAnyGun[player] = true
             end
-        else
-            clearOldStuff(player.Character)
         end
     end
 
@@ -689,14 +693,22 @@ local function detectRoles()
     end
 
     local higherPriorityActive = newHighestPriorityKillerDetected or specificJuggernautDetected or specialKillerDetected
-
-    if not higherPriorityActive then
-        if everyoneHasGunConditionMet and not rolesLockedByDistance then
-            rolesLockedByDistance = true
+    
+    -- REFACTORED: Manage Distance Lock State based on clear, non-overlapping conditions.
+    if higherPriorityActive or noOneHasGunConditionMet then
+        -- DEACTIVATE LOCK: A high-priority role has appeared, OR everyone has disarmed.
+        if rolesLockedByDistance then
+            rolesLockedByDistance = false
             lockedDistanceRoles = {}
-
+        end
+    elseif everyoneHasGunConditionMet then
+        -- ACTIVATE LOCK: Everyone has a weapon and no high-priority roles are present.
+        -- This block only runs once when the condition is first met.
+        if not rolesLockedByDistance then
+            rolesLockedByDistance = true
+            lockedDistanceRoles = {} -- Clear old roles before recalculating.
+    
             local localHRP = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-
             if localHRP then
                 for player, _ in pairs(playersWithValidCharacters) do
                     local playerHRP = player.Character:FindFirstChild("HumanoidRootPart")
@@ -710,30 +722,25 @@ local function detectRoles()
                     end
                 end
             else
+                -- Activation failed, reset state.
                 rolesLockedByDistance = false
                 lockedDistanceRoles = {}
                 warn("Blood Debt Role Detector: Distance Lock failed to activate: Local HRP missing.")
             end
-        elseif noOneHasGunConditionMet and rolesLockedByDistance then
-            rolesLockedByDistance = false
-            lockedDistanceRoles = {}
-        end
-    else
-        if rolesLockedByDistance then
-            rolesLockedByDistance = false
-            lockedDistanceRoles = {}
         end
     end
+    -- If none of these conditions are met (e.g., some have guns, some don't), 
+    -- the 'rolesLockedByDistance' state persists from the previous check, fulfilling the user's request.
 
     updateMatchingHintPlayers()
 
     for _, player in ipairs(Players:GetPlayers()) do
         if playersWithValidCharacters[player] then
             if newHighestPriorityKillerDetected and player == theSingleKillerGunHolder then
-                tagPlayer(player, killerColor, killerLabel)
+                playerRoles[player] = {label = killerLabel, color = killerColor}
             elseif specificJuggernautDetected then
                 if player == theSpecificJuggernautHolder then
-                    tagPlayer(player, killerColor, killerLabel)
+                    playerRoles[player] = {label = killerLabel, color = killerColor}
                 else
                     local toolsByName = collectPlayerTools(player)
                     local hasAnyRoleWeapon = false
@@ -745,44 +752,62 @@ local function detectRoles()
                     end
 
                     if hasAnyRoleWeapon then
-                        tagPlayer(player, vigilanteColor, vigilanteLabel)
+                        playerRoles[player] = {label = vigilanteLabel, color = vigilanteColor}
                     else
-                        tagPlayer(player, innocentColor, innocentLabel)
+                        playerRoles[player] = {label = innocentLabel, color = innocentColor}
                     end
                 end
             elseif specialKillerDetected then
                 if playersWithSpecialWeapons[player] then
-                    tagPlayer(player, killerColor, killerLabel)
+                    -- This player has a special weapon, they are the Killer.
+                    playerRoles[player] = {label = killerLabel, color = killerColor}
+                elseif playersWithVigilanteWeapons[player] then
+                    -- FIXED: Check if other players are Vigilantes instead of defaulting to Innocent.
+                    playerRoles[player] = {label = vigilanteLabel, color = vigilanteColor}
                 else
-                    tagPlayer(player, innocentColor, innocentLabel)
+                    -- This player has no special weapon and no vigilante weapon, they are Innocent.
+                    playerRoles[player] = {label = innocentLabel, color = innocentColor}
                 end
             elseif rolesLockedByDistance then
                 local lockedRole = lockedDistanceRoles[player]
                 if lockedRole then
                     if lockedRole == "Killer" then
-                        tagPlayer(player, killerColor, killerLabel)
+                        playerRoles[player] = {label = killerLabel, color = killerColor}
                     elseif lockedRole == "Innocent" then
-                        tagPlayer(player, innocentColor, innocentLabel)
+                        playerRoles[player] = {label = innocentLabel, color = innocentColor}
                     end
-                else
-                    clearOldStuff(player.Character)
                 end
             elseif playersMatchingHints[player] and playersWithVigilanteWeapons[player] then
-                tagPlayer(player, vigilanteHintColor, vigilanteHintLabel)
+                playerRoles[player] = {label = vigilanteHintLabel, color = vigilanteHintColor}
             elseif playersMatchingHints[player] and playersWithStandardKillerWeapons[player] then
-                tagPlayer(player, killerHintColor, killerHintLabel)
+                playerRoles[player] = {label = killerHintLabel, color = killerHintColor}
             elseif playersMatchingHints[player] and not playersWithStandardKillerWeapons[player] and not playersWithVigilanteWeapons[player] then
-                tagPlayer(player, hintMatchColor, hintMatchLabel)
+                playerRoles[player] = {label = hintMatchLabel, color = hintMatchColor}
             else
                 local toolsByName = collectPlayerTools(player)
                 local standardRole, standardColor, standardLabel = getStandardRoleFromWeapons(toolsByName)
                 if standardRole then
-                    tagPlayer(player, standardColor, standardLabel)
+                    playerRoles[player] = {label = standardLabel, color = standardColor}
                 else
-                    tagPlayer(player, innocentColor, innocentLabel)
+                    playerRoles[player] = {label = innocentLabel, color = innocentColor}
                 end
             end
-        else
+        end
+    end
+end
+-- NEW: This function reads from playerRoles and applies visuals if ESP is on.
+local function updateEspVisuals()
+    if not espEnabled then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= lp and player.Character then
+            local roleData = playerRoles[player]
+            if roleData then
+                tagPlayer(player, roleData.color, roleData.label)
+            else
+                clearOldStuff(player.Character)
+            end
+        elseif player.Character then
             clearOldStuff(player.Character)
         end
     end
@@ -794,22 +819,11 @@ local function disableEsp()
         stopEspLoop = true
         print("Blood Debt Role Detector: ESP Disabled")
 
-        rolesLockedByDistance = false
-        lockedDistanceRoles = {}
-        playersMatchingHints = {}
-        playersWithStandardKillerWeapons = {}
-        firstVigilanteTracker = {}
-
         if espPlayerAddedConnection then
             espPlayerAddedConnection:Disconnect()
             espPlayerAddedConnection = nil
         end
-
-        if hintTextConnection then
-            hintTextConnection:Disconnect()
-            hintTextConnection = nil
-        end
-
+        
         for player, connection in pairs(espCharacterAddedConnections) do
             if connection and typeof(connection) == "RBXScriptConnection" then
                 connection:Disconnect()
@@ -826,7 +840,7 @@ local function disableEsp()
 
         Rayfield:Notify({
             Title = "ESP Disabled",
-            Content = "Role detection has been turned off.",
+            Content = "Role visuals have been turned off.",
             Duration = 3,
             Image = 4483362458
         })
@@ -895,7 +909,7 @@ local DropdownNametagMode = Tab:CreateDropdown({
         
         -- Re-apply tags to update nametags immediately
         if espEnabled then
-            detectRoles()
+            updateEspVisuals()
         end
         
         Rayfield:Notify({
@@ -933,23 +947,22 @@ local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
 
                 task.spawn(function()
                     while espEnabled and not stopEspLoop do
+                        updateEspVisuals()
                         task.wait(0.5)
-                        detectRoles()
                     end
-                    print("Blood Debt Role Detector: ESP Detection loop stopped.")
+                    print("Blood Debt Role Detector: ESP Visuals loop stopped.")
                 end)
 
                 espPlayerAddedConnection = game.Players.PlayerAdded:Connect(function(player)
                     local charAddedConn = player.CharacterAdded:Connect(function(character)
                         task.wait(0.1)
-                        connectHintTextSignal()
-                        detectRoles()
+                        updateEspVisuals()
                     end)
                     espCharacterAddedConnections[player] = charAddedConn
 
                     if player.Character then
                         task.wait(0.1)
-                        detectRoles()
+                        updateEspVisuals()
                     end
                 end)
 
@@ -962,13 +975,12 @@ local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
                     end
                     clearOldStuff(player.Character)
                 end)
-
-                connectHintTextSignal()
-                detectRoles()
+                
+                updateEspVisuals()
 
                 Rayfield:Notify({
                     Title = "ESP Enabled",
-                    Content = "Role detection has been turned on.",
+                    Content = "Role visuals have been turned on.",
                     Duration = 3,
                     Image = 4483362458
                 })
@@ -976,7 +988,7 @@ local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
                 print("Blood Debt Role Detector: ESP is already enabled.")
                 Rayfield:Notify({
                     Title = "ESP Already On",
-                    Content = "Role detection is already running.",
+                    Content = "Role visuals are already running.",
                     Duration = 3,
                     Image = 4483362458
                 })
@@ -1029,6 +1041,23 @@ local AimbotActor = availableActors()[1] -- Get the actor thread we will send me
 local function trim(s)
     return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
+AimbotTab:CreateDropdown({
+    Name = "Bullet Redirection Target",
+    Options = {"All", "Killer", "Vigilante"},
+    CurrentOption = {"All"},
+    MultipleOptions = false,
+    Flag = "BulletRedirectionDropdown",
+    Callback = function(Option)
+        bulletRedirectionMode = Option[1] or "All"
+        print("Blood Debt Role Detector: Bullet Redirection mode changed to:", bulletRedirectionMode)
+        Rayfield:Notify({
+            Title = "Aimbot Target Changed",
+            Content = "Now redirecting to: " .. bulletRedirectionMode,
+            Duration = 3,
+            Image = 4483362458
+        })
+    end,
+})
 AimbotTab:CreateToggle({
     Name = "Aimbot Enabled",
     CurrentValue = LocalAimbotConfig.aimbotEnabled,
@@ -1150,6 +1179,7 @@ if getgenv().TargetParts == nil then getgenv().TargetParts = %s end
 if getgenv().radius == nil then getgenv().radius = %d end
 if getgenv().aimbotEnabled == nil then getgenv().aimbotEnabled = %s end
 if getgenv().fovVisible == nil then getgenv().fovVisible = %s end
+if getgenv().validAimbotTargets == nil then getgenv().validAimbotTargets = {} end
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
@@ -1408,6 +1438,9 @@ local bestTarget
 local bestPart
 local weight = -math.huge
 local _callback = function(component)
+if getgenv().validAimbotTargets[component:getName()] == nil then
+return nil
+end
 local character = component:getCharacter()
 if character == nil then
 return nil
@@ -1522,6 +1555,50 @@ CameraController.__init()
     )
     return code
 end
+-- NEW: This is the main, always-on loop for Role Detection and Aimbot Target Updating.
+task.spawn(function()
+    connectHintTextSignal()
+    while true do
+        -- Step 1: Detect roles and populate the playerRoles table.
+        detectRoles()
+        
+        -- Step 2: Determine valid aimbot targets based on the current mode.
+        local validTargetNames = {}
+        if bulletRedirectionMode == "All" then
+            -- Add all players except the local player to replicate original aimbot behavior.
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= lp then
+                    validTargetNames[player.Name] = true
+                end
+            end
+        elseif bulletRedirectionMode == "Killer" then
+            for player, data in pairs(playerRoles) do
+                if data and (data.label == killerLabel or data.label == killerHintLabel) then
+                    validTargetNames[player.Name] = true
+                end
+            end
+        elseif bulletRedirectionMode == "Vigilante" then
+            for player, data in pairs(playerRoles) do
+                if data and (data.label == vigilanteLabel or data.label == vigilanteHintLabel) then
+                    validTargetNames[player.Name] = true
+                end
+            end
+        end
+        
+        -- Step 3: Serialize the list of names and send it to the aimbot actor thread.
+        local namesString = "{"
+        for name, _ in pairs(validTargetNames) do
+            namesString = namesString .. '["' .. name .. '"]=true,'
+        end
+        namesString = namesString .. "}"
+        
+        if AimbotActor then
+            run(AimbotActor, string.format("getgenv().validAimbotTargets = %s", namesString))
+        end
+        
+        task.wait(0.5)
+    end
+end)
 if AimbotActor then
     if CheckFFlagValue("DebugRunParallelLuaOnMainThread", true) then
         print("User ran with FFlag ON")
