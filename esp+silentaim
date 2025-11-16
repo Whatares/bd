@@ -2,15 +2,12 @@
 --[[
 Integrated ESP LocalScript with Rayfield UI, Role Detection, Distance Locking,
 Enhanced Hint Matching, CUSTOMIZABLE NAMETAGS, and Aimbot.
-UPDATED: Added dropdown menu to select nametag display mode:
-- Role (Default): Shows the detected role
-- Username: Shows the player's Roblox username
-- Character Name: Shows the in-game character name from NPCSFolder
-UPDATED: Added Role Target Function for Bullet Redirection (Aimbot).
+UPDATED: Modified bullet redirection to support multiple target selection:
+- Removed "All" option
+- Added multi-select dropdown for Killer, Vigilante, and Innocent
+- Innocent targets are players without guns or unregistered guns
 - Role Detection is now always active.
 - ESP is now a visual layer that reads from the Role Detection data.
-- Aimbot targeting can be filtered to "All", "Killer", or "Vigilante".
-FIXED: Corrected role detection logic to improve Vigilante identification and make Distance Lock more reliable.
 ]]
 -- Load Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -234,8 +231,8 @@ local firstVigilanteTracker = {}
 local playersWithStandardKillerWeapons = {}
 -- NEW: Central data store for player roles. This is always updated.
 local playerRoles = {}
--- NEW: Aimbot targeting mode
-local bulletRedirectionMode = "All"
+-- NEW: Aimbot targeting modes (can select multiple)
+local bulletRedirectionModes = {"Killer"} -- Default to Killer only
 -- NEW: Function to get character name from NPCSFolder
 local function getCharacterName(player)
     if NPCSFolder then
@@ -1046,18 +1043,19 @@ local AimbotActor = availableActors()[1] -- Get the actor thread we will send me
 local function trim(s)
     return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
+-- NEW: Multi-select dropdown for bullet redirection targets
 AimbotTab:CreateDropdown({
     Name = "Bullet Redirection Target",
-    Options = {"All", "Killer", "Vigilante"},
-    CurrentOption = {"All"},
-    MultipleOptions = false,
+    Options = {"Killer", "Vigilante", "Innocent"},
+    CurrentOption = {"Killer"},
+    MultipleOptions = true,
     Flag = "BulletRedirectionDropdown",
-    Callback = function(Option)
-        bulletRedirectionMode = Option[1] or "All"
-        print("Blood Debt Role Detector: Bullet Redirection mode changed to:", bulletRedirectionMode)
+    Callback = function(Options)
+        bulletRedirectionModes = Options
+        print("Blood Debt Role Detector: Bullet Redirection modes changed to:", table.concat(Options, ", "))
         Rayfield:Notify({
-            Title = "Aimbot Target Changed",
-            Content = "Now redirecting to: " .. bulletRedirectionMode,
+            Title = "Aimbot Targets Changed",
+            Content = "Now targeting: " .. table.concat(Options, ", "),
             Duration = 3,
             Image = 4483362458
         })
@@ -1560,6 +1558,15 @@ CameraController.__init()
     )
     return code
 end
+-- NEW: Helper function to check if a table contains a value
+local function tableContains(tbl, value)
+    for _, v in ipairs(tbl) do
+        if v == value then
+            return true
+        end
+    end
+    return false
+end
 -- NEW: This is the main, always-on loop for Role Detection and Aimbot Target Updating.
 task.spawn(function()
     connectHintTextSignal()
@@ -1567,24 +1574,36 @@ task.spawn(function()
         -- Step 1: Detect roles and populate the playerRoles table.
         detectRoles()
         
-        -- Step 2: Determine valid aimbot targets based on the current mode.
+        -- Step 2: Determine valid aimbot targets based on the selected modes.
         local validTargetNames = {}
-        if bulletRedirectionMode == "All" then
-            -- Add all players except the local player to replicate original aimbot behavior.
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= lp then
-                    validTargetNames[player.Name] = true
+        
+        for player, data in pairs(playerRoles) do
+            if data then
+                -- Check if this player's role matches any selected target mode
+                local shouldTarget = false
+                
+                -- Check for Killer targeting
+                if tableContains(bulletRedirectionModes, "Killer") then
+                    if data.label == killerLabel or data.label == killerHintLabel then
+                        shouldTarget = true
+                    end
                 end
-            end
-        elseif bulletRedirectionMode == "Killer" then
-            for player, data in pairs(playerRoles) do
-                if data and (data.label == killerLabel or data.label == killerHintLabel) then
-                    validTargetNames[player.Name] = true
+                
+                -- Check for Vigilante targeting
+                if tableContains(bulletRedirectionModes, "Vigilante") then
+                    if data.label == vigilanteLabel or data.label == vigilanteHintLabel then
+                        shouldTarget = true
+                    end
                 end
-            end
-        elseif bulletRedirectionMode == "Vigilante" then
-            for player, data in pairs(playerRoles) do
-                if data and (data.label == vigilanteLabel or data.label == vigilanteHintLabel) then
+                
+                -- Check for Innocent targeting
+                if tableContains(bulletRedirectionModes, "Innocent") then
+                    if data.label == innocentLabel or data.label == hintMatchLabel then
+                        shouldTarget = true
+                    end
+                end
+                
+                if shouldTarget then
                     validTargetNames[player.Name] = true
                 end
             end
