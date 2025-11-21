@@ -237,6 +237,7 @@ local playersMatchingHints = {}
 local hintTextConnection = nil
 local firstVigilanteTracker = {}
 local playersWithStandardKillerWeapons = {}
+local droppedGunConnections = {}
 
 -- NEW: Function to get character name from NPCSFolder
 local function getCharacterName(player)
@@ -325,6 +326,68 @@ local function clearOldStuff(character)
     if head then
         local tag = head:FindFirstChild("RoleBillboard")
         if tag then tag:Destroy() end
+    end
+end
+
+local function clearDroppedGunEsp(gunTool)
+    if not gunTool then return end
+    local old = gunTool:FindFirstChildWhichIsA("Highlight")
+    if old then old:Destroy() end
+end
+
+local function addDroppedGunEsp(gunTool)
+    if not gunTool or not gunTool:IsA("Tool") then return end
+
+    clearDroppedGunEsp(gunTool)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "DroppedGunHighlight"
+    highlight.Adornee = gunTool                     -- ← Highlights the WHOLE gun (all parts + welds)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = true
+    highlight.FillColor = Color3.fromRGB(255, 255, 0)       -- Bright yellow
+    highlight.FillTransparency = 0.4
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)  -- White outline
+    highlight.OutlineTransparency = 0
+    highlight.Parent = gunTool                       -- Parent to the Tool itself
+end
+
+local function updateDroppedGunEsp()
+    if not espEnabled or not BloodFolder then return end
+
+    for _, obj in ipairs(BloodFolder:GetChildren()) do
+        if obj:IsA("Tool") then
+            local weaponName = obj.Name
+            if killerWeapons[weaponName] or vigilanteWeapons[weaponName] or specialKillerWeapons[weaponName] then
+                addDroppedGunEsp(obj)
+
+                -- Track removal in case it's picked up
+                if not droppedGunConnections[obj] then
+                    droppedGunConnections[obj] = obj.AncestryChanged:Connect(function()
+                        if not obj.Parent then
+                            clearDroppedGunEsp(obj)
+                            droppedGunConnections[obj]:Disconnect()
+                            droppedGunConnections[obj] = nil
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-- Clear all dropped gun ESP when disabling
+local function clearAllDroppedGunEsp()
+    if BloodFolder then
+        for _, obj in BloodFolder:GetChildren() do
+            if obj:IsA("Tool") then
+                clearDroppedGunEsp(obj)
+            end
+        end
+    end
+    for tool, conn in pairs(droppedGunConnections) do
+        if conn and conn.Connected then conn:Disconnect() end
+        droppedGunConnections[tool] = nil
     end
 end
 
@@ -848,10 +911,10 @@ local function disableEsp()
                 clearOldStuff(player.Character)
             end
         end
-
+        clearAllDroppedGunEsp() 
         Rayfield:Notify({
             Title = "ESP Disabled",
-            Content = "Role detection has been turned off.",
+            Content = "Role detection and dropped gun ESP have been turned off.",
             Duration = 3,
             Image = 4483362458
         })
@@ -963,6 +1026,7 @@ local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
                 task.spawn(function()
                     while espEnabled and not stopEspLoop do
                         task.wait(0.5)
+                        updateDroppedGunEsp()
                         detectRoles()
                     end
                     print("Blood Debt Role Detector: ESP Detection loop stopped.")
@@ -994,6 +1058,7 @@ local ButtonEnableESPCreateSuccess, ButtonEnableESP = pcall(function()
 
                 connectHintTextSignal()
                 detectRoles()
+                updateDroppedGunEsp()
 
                 Rayfield:Notify({
                     Title = "ESP Enabled",
@@ -1028,6 +1093,16 @@ local ButtonDisableESPCreateSuccess, ButtonDisableESP = pcall(function()
             disableEsp()
         end
     })
+end)
+
+BloodFolder.ChildRemoved:Connect(function(child)
+    if child:IsA("Tool") then
+        clearDroppedGunEsp(child)
+        if droppedGunConnections[child] then
+            droppedGunConnections[child]:Disconnect()
+            droppedGunConnections[child] = nil
+        end
+    end
 end)
 
 if not ButtonDisableESPCreateSuccess or not ButtonDisableESP then
