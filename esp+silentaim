@@ -34,6 +34,7 @@ local nametagMode = "Role" -- Options: "Role", "Username", "Character Name"
 
 -- Weapon lists
 local killerWeapons = {
+    ["OTz-02"] = true,
     ["CharcoalSteel JS-22"] = true, 
     ["Pretty Pink RR-LCP"] = true, 
     ["JS2-BondsDerringy"] = true,
