@@ -187,6 +187,7 @@ local killerWeapons = {
 }
 
 local vigilanteWeapons = {
+    ["Beagle-44"] = true, 
     ["Beagle"] = true, 
     ["Beagle TIGERSTRIPES"] = true, 
     ["Paradise Beagle"] = true,
