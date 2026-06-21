@@ -144,7 +144,7 @@ local killerWeapons = {
     ["Camo RR-LCPS"] = true, 
     ["Daniqui-Obrez"] = true, 
     ["J21a Meretta"] = true, ["JS"] = true,
-    ["Steel 1985-Rosey"] = true, 
+    ["Steel 1895-Rosey"] = true, 
     ["Sawed-THUMPA"] = true, 
     ["Gild JS"] = true, 
     ["ZT-33"] = true,
