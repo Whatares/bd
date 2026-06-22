@@ -255,6 +255,7 @@ local specialKillerWeapons = {
     ["Pretty Pink RVK"] = true,
     ["Zimniy Voron"] = true, 
     ["Zimniy Tsar"] = true,
+    ["THE BEAR's Plaything"] = true,
 }
 
 local specificJuggernautWeapons = {
